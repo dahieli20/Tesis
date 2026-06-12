@@ -1,0 +1,98 @@
+<div class="page">
+  <div class="header">
+    <h1>Data Lake Filter</h1>
+    <p>
+      Herramienta para analizar archivos CSV antes de ingresarlos al Data Lake.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Subir dataset CSV</h2>
+
+    <div class="upload-box">
+      <input type="file" accept=".csv" (change)="onFileSelected($event)" />
+
+      <p *ngIf="selectedFile" class="selected-file">
+        Archivo seleccionado: <strong>{{ selectedFile.name }}</strong>
+      </p>
+
+      <button type="button" (click)="uploadFile()" [disabled]="loading">
+        {{ loading ? 'Analizando...' : 'Subir y analizar' }}
+      </button>
+
+      <p class="error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+    </div>
+  </div>
+
+  <div class="card result-card" *ngIf="result">
+    <div class="result-header">
+      <h2>Resultado del análisis</h2>
+      <span class="status" [ngClass]="result.status.toLowerCase()">
+        {{ getStatusLabel(result.status) }}
+      </span>
+    </div>
+
+    <div class="info-grid">
+      <div>
+        <span>Archivo</span>
+        <strong>{{ result.fileName }}</strong>
+      </div>
+
+      <div>
+        <span>Ruta destino</span>
+        <strong>{{ result.path }}</strong>
+      </div>
+
+      <div>
+        <span>Coincidencia parcial</span>
+        <strong>{{ result.partialMatchPercentage || 0 }}%</strong>
+      </div>
+
+      <div>
+        <span>Coincide con</span>
+        <strong>{{ result.matchedWith || 'Ninguno' }}</strong>
+      </div>
+    </div>
+
+    <div class="message" [ngClass]="result.status.toLowerCase()">
+        <strong>Motivo:</strong>
+        <span>{{ result.message }}</span>
+
+        <p class="recommendation">
+            <strong>Recomendación:</strong>
+            <span>{{ getRecommendation(result.status) }}</span>
+        </p>
+    </div>
+
+    <h3>Calidad del CSV</h3>
+
+    <div class="quality-grid" *ngIf="result.quality">
+      <div>
+        <span>Filas</span>
+        <strong>{{ result.quality.totalRows }}</strong>
+      </div>
+
+      <div>
+        <span>Columnas</span>
+        <strong>{{ result.quality.totalColumns }}</strong>
+      </div>
+
+      <div>
+        <span>Valores nulos</span>
+        <strong>{{ result.quality.nullPercentage }}%</strong>
+      </div>
+
+      <div>
+        <span>Filas duplicadas internas</span>
+        <strong>{{ result.quality.duplicateRowsPercentage }}%</strong>
+      </div>
+
+      <div>
+        <span>Columnas duplicadas</span>
+        <strong>{{ result.quality.hasDuplicateColumns ? 'Sí' : 'No' }}</strong>
+      </div>
+    </div>
+  </div>
+</div>
