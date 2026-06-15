@@ -4,6 +4,7 @@ import { HttpClientModule } from '@angular/common/http';
 
 import { AppComponent } from './app.component';
 import { DatasetsModule } from './features/datasets/datasets.module';
+import { AppRoutingModule } from './app-routing.module';
 
 @NgModule({
   declarations: [
@@ -12,7 +13,8 @@ import { DatasetsModule } from './features/datasets/datasets.module';
   imports: [
     BrowserModule,
     HttpClientModule,
-    DatasetsModule
+    DatasetsModule,
+    AppRoutingModule
   ],
   providers: [],
   bootstrap: [AppComponent]

@@ -1,98 +1,298 @@
-<div class="page">
-  <div class="header">
-    <h1>Data Lake Filter</h1>
-    <p>
-      Herramienta para analizar archivos CSV antes de ingresarlos al Data Lake.
-    </p>
-  </div>
-
-  <div class="card">
-    <h2>Subir dataset CSV</h2>
-
-    <div class="upload-box">
-      <input type="file" accept=".csv" (change)="onFileSelected($event)" />
-
-      <p *ngIf="selectedFile" class="selected-file">
-        Archivo seleccionado: <strong>{{ selectedFile.name }}</strong>
-      </p>
-
-      <button type="button" (click)="uploadFile()" [disabled]="loading">
-        {{ loading ? 'Analizando...' : 'Subir y analizar' }}
-      </button>
-
-      <p class="error" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </p>
+<div class="page-shell">
+<header class="top-header">
+  <div class="brand">
+    <div>
+      <h1>Data Lake Filter</h1>
+      <p>Herramienta para analizar archivos CSV antes de ingresarlos al Data Lake.</p>
     </div>
   </div>
 
-  <div class="card result-card" *ngIf="result">
-    <div class="result-header">
-      <h2>Resultado del análisis</h2>
-      <span class="status" [ngClass]="result.status.toLowerCase()">
-        {{ getStatusLabel(result.status) }}
-      </span>
-    </div>
+<nav class="header-status-buttons" aria-label="Estados de datasets">
+  <button
+    type="button"
+    class="status-nav-button accepted"
+    [class.active]="activeStatusView === 'ACCEPTED'"
+    (click)="goToStatusView('ACCEPTED')"
+  >
+    <span class="status-icon">✓</span>
+    <span class="status-label">Aceptados</span>
+    <span class="status-number">{{ acceptedCount }}</span>
+  </button>
 
-    <div class="info-grid">
-      <div>
-        <span>Archivo</span>
-        <strong>{{ result.fileName }}</strong>
-      </div>
+  <button
+    type="button"
+    class="status-nav-button review"
+    [class.active]="activeStatusView === 'REVIEW'"
+    (click)="goToStatusView('REVIEW')"
+  >
+    <span class="status-icon">◔</span>
+    <span class="status-label">En revisión</span>
+    <span class="status-number">{{ reviewCount }}</span>
+  </button>
 
-      <div>
-        <span>Ruta destino</span>
-        <strong>{{ result.path }}</strong>
-      </div>
+  <button
+    type="button"
+    class="status-nav-button rejected"
+    [class.active]="activeStatusView === 'REJECTED'"
+    (click)="goToStatusView('REJECTED')"
+  >
+    <span class="status-icon">✕</span>
+    <span class="status-label">Rechazados</span>
+    <span class="status-number">{{ rejectedCount }}</span>
+  </button>
+</nav>
+</header>
 
-      <div>
-        <span>Coincidencia parcial</span>
-        <strong>{{ result.partialMatchPercentage || 0 }}%</strong>
-      </div>
+  <main class="dashboard">
+    <section class="top-grid">
+      <!-- SUBIR DATASETS -->
+      <div class="card upload-card">
+        <div class="card-title">
+          <h2>Subir datasets CSV</h2>
+        </div>
 
-      <div>
-        <span>Coincide con</span>
-        <strong>{{ result.matchedWith || 'Ninguno' }}</strong>
-      </div>
-    </div>
+        <input
+          #fileInput
+          class="hidden-file-input"
+          type="file"
+          accept=".csv"
+          multiple
+          (change)="onFilesSelected($event)"
+          [disabled]="loading"
+        />
 
-    <div class="message" [ngClass]="result.status.toLowerCase()">
-        <strong>Motivo:</strong>
-        <span>{{ result.message }}</span>
+        <div
+          class="drop-zone"
+          [class.dragging]="isDragging"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)"
+        >
+          <p>Arrastre o suelte uno o más archivos CSV aquí</p>
+          <button
+            type="button"
+            class="primary-button"
+            (click)="openFileSelector()"
+            [disabled]="loading"
+          >
+           Agregar archivos
+          </button>
 
-        <p class="recommendation">
-            <strong>Recomendación:</strong>
-            <span>{{ getRecommendation(result.status) }}</span>
+        </div>
+
+        <div class="upload-footer">
+        </div>
+
+        <p class="error-text" *ngIf="errorMessage">
+          {{ errorMessage }}
         </p>
-    </div>
+      </div>
+    </section>
 
-    <h3>Calidad del CSV</h3>
+    <!-- PARTE INFERIOR -->
+    <section class="content-grid">
+      <!-- CARPETA DE ESPERA -->
+      <div class="card queue-card">
+        <div class="section-header">
+          <div>
+            <h2>Carpeta de espera</h2>
+            <p>Seleccioná un archivo para ver el detalle del análisis.</p>
+          </div>
 
-    <div class="quality-grid" *ngIf="result.quality">
-      <div>
-        <span>Filas</span>
-        <strong>{{ result.quality.totalRows }}</strong>
+          <span class="counter-pill">
+            {{ fileQueue.length }} archivo{{ fileQueue.length === 1 ? '' : 's' }}
+          </span>
+        </div>
+
+        <ng-container *ngIf="fileQueue.length > 0; else emptyQueue">
+          <div class="queue-list">
+            <div
+              class="queue-item"
+              *ngFor="let item of fileQueue; let i = index"
+              [class.active]="selectedIndex === i"
+              (click)="selectFile(i)"
+            >
+             
+
+              <div class="file-data">
+                <strong>{{ item.file.name }}</strong>
+                <span>{{ formatFileSize(item.file.size) }}</span>
+              </div>
+
+              <span
+                class="status-pill"
+                [ngClass]="getItemDisplayStatusClass(item)"
+              >
+                {{ getItemDisplayStatusLabel(item) }}
+              </span>
+
+              <button
+                type="button"
+                class="icon-button"
+                (click)="removeFile(i); $event.stopPropagation()"
+                [disabled]="loading"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-template #emptyQueue>
+          <div class="empty-state">
+            <div class="empty-icon">📁</div>
+            <h3>Todavía no hay archivos en espera</h3>
+            <p>Agregá archivos para comenzar el análisis.</p>
+          </div>
+        </ng-template>
+
+      <div class="queue-bottom-row">
+        <p class="queue-footer">
+          Mostrando {{ fileQueue.length }} de {{ fileQueue.length }} archivos
+        </p>
+
+        <div class="upload-actions">
+          <button
+            type="button"
+            class="secondary-button"
+            (click)="clearQueue()"
+            [disabled]="loading || fileQueue.length === 0"
+          >
+            Limpiar
+          </button>
+
+          <button
+            type="button"
+            class="primary-button analyze-button"
+            (click)="uploadAllFiles()"
+            [disabled]="loading || fileQueue.length === 0"
+          >
+            {{ loading ? 'Analizando archivos...' : 'Subir y analizar' }}
+          </button>
+        </div>
       </div>
 
-      <div>
-        <span>Columnas</span>
-        <strong>{{ result.quality.totalColumns }}</strong>
       </div>
 
-      <div>
-        <span>Valores nulos</span>
-        <strong>{{ result.quality.nullPercentage }}%</strong>
-      </div>
+      <!-- DETALLE DEL ARCHIVO -->
+      <div class="card detail-card">
+        <ng-container *ngIf="selectedItem; else emptyDetail">
+          <div class="detail-header">
+            <div class="detail-file">
 
-      <div>
-        <span>Filas duplicadas internas</span>
-        <strong>{{ result.quality.duplicateRowsPercentage }}%</strong>
-      </div>
 
-      <div>
-        <span>Columnas duplicadas</span>
-        <strong>{{ result.quality.hasDuplicateColumns ? 'Sí' : 'No' }}</strong>
+              <div>
+                <h2>{{ selectedItem.file.name }}</h2>
+                <p>{{ formatFileSize(selectedItem.file.size) }}</p>
+              </div>
+            </div>
+
+            <span
+              class="status-pill large"
+              [ngClass]="getItemDisplayStatusClass(selectedItem)"
+            >
+              {{ getItemDisplayStatusLabel(selectedItem) }}
+            </span>
+          </div>
+
+          <p class="error-text" *ngIf="selectedItem.errorMessage">
+            {{ selectedItem.errorMessage }}
+          </p>
+
+          <ng-container *ngIf="selectedItem.result; else noResultYet">
+            <div class="info-grid">
+              <div>
+                <span>Archivo</span>
+                <strong>{{ selectedItem.result.fileName }}</strong>
+              </div>
+
+              <div>
+                <span>Ruta destino</span>
+                <strong>{{ selectedItem.result.path }}</strong>
+              </div>
+
+              <div>
+                <span>Coincidencia parcial</span>
+                <strong>{{ selectedItem.result.partialMatchPercentage || 0 }}%</strong>
+              </div>
+
+              <div>
+                <span>Coincide con</span>
+                <strong>{{ selectedItem.result.matchedWith || 'Ninguno' }}</strong>
+              </div>
+            </div>
+
+<div class="message-box">
+              <div>
+                <strong>Motivo</strong>
+                <p>{{ selectedItem.result.message }}</p>
+              </div>
+
+              <div>
+                <strong>Recomendación</strong>
+                <p>{{ getRecommendation(selectedItem.result.status) }}</p>
+              </div>
+            </div>
+
+            <h3>Calidad del CSV</h3>
+
+            <div class="quality-grid" *ngIf="selectedItem.result.quality">
+              <div>
+                <span>Filas</span>
+                <strong>{{ selectedItem.result.quality.totalRows }}</strong>
+              </div>
+
+              <div>
+                <span>Columnas</span>
+                <strong>{{ selectedItem.result.quality.totalColumns }}</strong>
+              </div>
+
+              <div>
+                <span>Valores nulos</span>
+                <strong>{{ selectedItem.result.quality.nullPercentage }}%</strong>
+              </div>
+
+              <div>
+                <span>Filas duplicadas internas</span>
+                <strong>{{ selectedItem.result.quality.duplicateRowsPercentage }}%</strong>
+              </div>
+
+              <div>
+                <span>Columnas duplicadas</span>
+                <strong>
+                  {{ selectedItem.result.quality.hasDuplicateColumns ? 'Sí' : 'No' }}
+                </strong>
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-template #noResultYet>
+            <div class="empty-state detail-empty">
+              <div class="empty-icon">📄</div>
+              <h3>Sin resultados todavía</h3>
+              <p>Este archivo aún no fue analizado.</p>
+            </div>
+          </ng-template>
+        </ng-container>
+
+        <ng-template #emptyDetail>
+          <div class="section-header">
+            <div>
+              <h2>Detalle del análisis</h2>
+              <p>Seleccioná un archivo para ver sus resultados.</p>
+            </div>
+          </div>
+
+          <div class="empty-state detail-empty">
+            <div class="empty-icon">📊</div>
+            <h3>Seleccioná un archivo para ver el detalle del análisis.</h3>
+            <p>
+              Acá podrás revisar la calidad de los datos, estadísticas,
+              columnas, reglas y resultados del procesamiento.
+            </p>
+          </div>
+        </ng-template>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 </div>
