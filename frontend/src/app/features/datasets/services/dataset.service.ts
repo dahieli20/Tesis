@@ -39,4 +39,18 @@ export class DatasetService {
 
     return this.http.post<UploadDatasetResponse>(`${this.apiUrl}/upload`, formData);
   }
+
+  approveDataset(dataset: UploadDatasetResponse): Observable<UploadDatasetResponse> {
+    return this.http.post<UploadDatasetResponse>(
+      `${this.apiUrl}/review/approve`,
+      dataset
+    );
+  }
+
+  rejectDataset(dataset: UploadDatasetResponse): Observable<UploadDatasetResponse> {
+    return this.http.post<UploadDatasetResponse>(
+      `${this.apiUrl}/review/reject`,
+      dataset
+    );
+  }
 }

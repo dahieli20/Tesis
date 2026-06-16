@@ -1,10 +1,13 @@
 package com.datalakefilter.service;
 
 import io.minio.BucketExistsArgs;
+import io.minio.CopyObjectArgs;
+import io.minio.CopySource;
 import io.minio.MinioClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import org.springframework.web.multipart.MultipartFile;
 import io.minio.GetObjectArgs;
 import io.minio.ListObjectsArgs;
@@ -94,6 +97,32 @@ public class MinioService {
             );
         } catch (Exception e) {
             throw new RuntimeException("Error al obtener archivo desde MinIO", e);
+        }
+    }
+
+    public void moveFile(String sourceObjectName, String targetObjectName) {
+        try {
+            minioClient.copyObject(
+                    CopyObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(targetObjectName)
+                            .source(
+                                    CopySource.builder()
+                                            .bucket(bucketName)
+                                            .object(sourceObjectName)
+                                            .build()
+                            )
+                            .build()
+            );
+
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(sourceObjectName)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Error al mover archivo en MinIO", e);
         }
     }
 }

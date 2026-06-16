@@ -339,16 +339,19 @@ approveSelectedReviewItem(): void {
     return;
   }
 
-  item.result = {
-    ...item.result,
-    status: 'ACCEPTED',
-    path: `raw/${item.result.fileName}`,
-    message: 'Documento aprobado manualmente por el usuario. Guardado en raw.'
-  };
+  this.datasetService.approveDataset(item.result).subscribe({
+    next: result => {
+      item.result = result;
+      item.state = 'DONE';
 
-  item.state = 'DONE';
-
-  this.selectFirstReviewItem();
+      this.syncQueueState();
+      this.selectFirstReviewItem();
+    },
+    error: () => {
+      item.errorMessage = 'No se pudo aprobar el documento en el backend.';
+      this.syncQueueState();
+    }
+  });
 }
 
 rejectSelectedReviewItem(): void {
@@ -358,16 +361,19 @@ rejectSelectedReviewItem(): void {
     return;
   }
 
-  item.result = {
-    ...item.result,
-    status: 'REJECTED',
-    path: `rejected/${item.result.fileName}`,
-    message: 'Documento rechazado manualmente por el usuario. Guardado en rejected.'
-  };
+  this.datasetService.rejectDataset(item.result).subscribe({
+    next: result => {
+      item.result = result;
+      item.state = 'DONE';
 
-  item.state = 'DONE';
-
-  this.selectFirstReviewItem();
+      this.syncQueueState();
+      this.selectFirstReviewItem();
+    },
+    error: () => {
+      item.errorMessage = 'No se pudo rechazar el documento en el backend.';
+      this.syncQueueState();
+    }
+  });
 }
 
 goToReviewView(): void {

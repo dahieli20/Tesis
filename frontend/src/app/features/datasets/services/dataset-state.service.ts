@@ -21,24 +21,17 @@ export class DatasetStateService {
 
   updateItemStatus(
     targetItem: FileQueueItem,
-    status: 'ACCEPTED' | 'REJECTED',
-    destinationFolder: 'raw' | 'rejected',
-    message: string
+    result: FileQueueItem['result']
   ): void {
     const updatedQueue = this.fileQueueSubject.value.map(item => {
-      if (item !== targetItem || !item.result) {
+      if (item !== targetItem || !result) {
         return item;
       }
 
       return {
         ...item,
         state: 'DONE' as const,
-        result: {
-          ...item.result,
-          status,
-          path: `${destinationFolder}/${item.result.fileName}`,
-          message
-        }
+        result
       };
     });
 

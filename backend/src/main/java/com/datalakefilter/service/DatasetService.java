@@ -1,14 +1,18 @@
 package com.datalakefilter.service;
 
+import com.datalakefilter.dto.DatasetDecisionRequest;
 import com.datalakefilter.dto.CsvQualityResult;
 import com.datalakefilter.dto.UploadDatasetResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Service
 public class DatasetService {
@@ -201,6 +205,24 @@ public class DatasetService {
         );
     }
 
+    public UploadDatasetResponse approveDataset(DatasetDecisionRequest request) {
+        return resolveReviewDecision(
+                request,
+                "ACCEPTED",
+                "raw",
+                "Documento aprobado manualmente por el usuario. Guardado en raw."
+        );
+    }
+
+    public UploadDatasetResponse rejectDataset(DatasetDecisionRequest request) {
+        return resolveReviewDecision(
+                request,
+                "REJECTED",
+                "rejected",
+                "Documento rechazado manualmente por el usuario. Guardado en rejected."
+        );
+    }
+
     private double calculateMatchPercentage(
             Set<String> newRows,
             Set<String> existingRows
@@ -217,5 +239,76 @@ public class DatasetService {
         return Math.round(
                 ((intersection.size() * 100.0) / newRows.size()) * 100.0
         ) / 100.0;
+    }
+
+    private UploadDatasetResponse resolveReviewDecision(
+            DatasetDecisionRequest request,
+            String status,
+            String destinationFolder,
+            String message
+    ) {
+        if (request == null) {
+            throw new ResponseStatusException(
+                    BAD_REQUEST,
+                    "La solicitud de decisión manual es obligatoria."
+            );
+        }
+
+        String sourcePath = validateReviewPath(request.path());
+        String fileName = resolveFileName(request.fileName(), sourcePath);
+        String destinationPath = destinationFolder + "/" + fileName;
+
+        minioService.moveFile(sourcePath, destinationPath);
+
+        return new UploadDatasetResponse(
+                fileName,
+                destinationPath,
+                status,
+                message,
+                request.fileHash(),
+                request.partialMatchPercentage(),
+                request.matchedWith(),
+                request.quality()
+        );
+    }
+
+    private String validateReviewPath(String path) {
+        if (path == null || path.isBlank()) {
+            throw new ResponseStatusException(
+                    BAD_REQUEST,
+                    "La ruta del archivo en revisión es obligatoria."
+            );
+        }
+
+        if (!path.startsWith("review/")) {
+            throw new ResponseStatusException(
+                    BAD_REQUEST,
+                    "Solo se pueden aprobar o rechazar archivos ubicados en review."
+            );
+        }
+
+        return path;
+    }
+
+    private String resolveFileName(String fileName, String sourcePath) {
+        String resolvedFileName = fileName;
+
+        if (resolvedFileName == null || resolvedFileName.isBlank()) {
+            int separatorIndex = sourcePath.lastIndexOf("/");
+            resolvedFileName = separatorIndex >= 0
+                    ? sourcePath.substring(separatorIndex + 1)
+                    : sourcePath;
+        }
+
+        if (resolvedFileName.isBlank()
+                || resolvedFileName.contains("/")
+                || resolvedFileName.contains("\\")) {
+            throw new ResponseStatusException(
+                    BAD_REQUEST,
+                    "El nombre del archivo no es válido."
+            );
+        }
+
+        return resolvedFileName;
     }
 }

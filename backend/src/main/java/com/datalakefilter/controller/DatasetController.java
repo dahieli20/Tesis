@@ -1,5 +1,6 @@
 package com.datalakefilter.controller;
 
+import com.datalakefilter.dto.DatasetDecisionRequest;
 import com.datalakefilter.dto.UploadDatasetResponse;
 import com.datalakefilter.service.DatasetService;
 import org.springframework.web.bind.annotation.*;
@@ -19,5 +20,19 @@ public class DatasetController {
     @PostMapping("/upload")
     public UploadDatasetResponse uploadDataset(@RequestParam("file") MultipartFile file) {
         return datasetService.processDataset(file);
+    }
+
+    @PostMapping("/review/approve")
+    public UploadDatasetResponse approveDataset(
+            @RequestBody DatasetDecisionRequest request
+    ) {
+        return datasetService.approveDataset(request);
+    }
+
+    @PostMapping("/review/reject")
+    public UploadDatasetResponse rejectDataset(
+            @RequestBody DatasetDecisionRequest request
+    ) {
+        return datasetService.rejectDataset(request);
     }
 }

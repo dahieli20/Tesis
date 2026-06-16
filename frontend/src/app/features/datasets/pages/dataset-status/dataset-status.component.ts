@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { DatasetService } from '../../services/dataset.service';
 import { DatasetStateService } from '../../services/dataset-state.service';
 import { FileQueueItem, StatusView } from '../../../../models/dataset-queue.model';
 
@@ -23,6 +24,7 @@ export class DatasetStatusComponent {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
+    private datasetService: DatasetService,
     private datasetStateService: DatasetStateService
   ) {}
 
@@ -176,12 +178,13 @@ export class DatasetStatusComponent {
       return;
     }
 
-    this.datasetStateService.updateItemStatus(
-      item,
-      'ACCEPTED',
-      'raw',
-      'Documento aprobado manualmente por el usuario. Guardado en raw.'
-    );
+    this.datasetService.approveDataset(item.result).subscribe({
+      next: result => this.datasetStateService.updateItemStatus(item, result),
+      error: () => {
+        item.errorMessage = 'No se pudo aprobar el documento en el backend.';
+        this.datasetStateService.setFileQueue(this.fileQueue);
+      }
+    });
   }
 
   rejectSelectedItem(): void {
@@ -191,12 +194,13 @@ export class DatasetStatusComponent {
       return;
     }
 
-    this.datasetStateService.updateItemStatus(
-      item,
-      'REJECTED',
-      'rejected',
-      'Documento rechazado manualmente por el usuario. Guardado en rejected.'
-    );
+    this.datasetService.rejectDataset(item.result).subscribe({
+      next: result => this.datasetStateService.updateItemStatus(item, result),
+      error: () => {
+        item.errorMessage = 'No se pudo rechazar el documento en el backend.';
+        this.datasetStateService.setFileQueue(this.fileQueue);
+      }
+    });
   }
 
   formatFileSize(size: number): string {
