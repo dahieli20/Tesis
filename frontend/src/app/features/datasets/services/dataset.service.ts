@@ -24,6 +24,27 @@ export interface UploadDatasetResponse {
   quality: CsvQualityResult;
 }
 
+export interface AuditFactorResponse {
+  name: string;
+  value: number;
+  weight: number;
+  contribution: number;
+  description: string;
+}
+
+export interface DataLakeAuditResponse {
+  totalFiles: number;
+  rawFiles: number;
+  reviewFiles: number;
+  rejectedFiles: number;
+  stateRiskPercentage: number;
+  rawQualityRiskPercentage: number;
+  rawDuplicationRiskPercentage: number;
+  globalRiskPercentage: number;
+  classification: string;
+  message: string;
+  factors: AuditFactorResponse[];
+}
 @Injectable({
   providedIn: 'root'
 })
@@ -53,4 +74,14 @@ export class DatasetService {
       dataset
     );
   }
+
+  getGlobalAudit(): Observable<DataLakeAuditResponse> {
+    const timestamp = new Date().getTime();
+
+    return this.http.get<DataLakeAuditResponse>(
+      `${this.apiUrl}/audit/global?t=${timestamp}`
+    );
+  }
+
+
 }

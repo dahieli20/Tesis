@@ -1,9 +1,8 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-
-import { DatasetService } from '../../services/dataset.service';
 import { DatasetStateService } from '../../services/dataset-state.service';
+import {DatasetService,DataLakeAuditResponse} from '../../services/dataset.service';
 
 import {
   FileQueueItem,
@@ -19,12 +18,13 @@ import {
   templateUrl: './dataset-upload.component.html',
   styleUrls: ['./dataset-upload.component.css']
 })
-export class DatasetUploadComponent {
+export class DatasetUploadComponent implements OnInit {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   fileQueue: FileQueueItem[] = [];
   selectedIndex: number | null = null;
   activeStatusView: StatusView | null = null;
+  globalAudit: DataLakeAuditResponse | null = null;
 
   loading = false;
   errorMessage = '';
@@ -41,6 +41,10 @@ constructor(
     this.selectedIndex = 0;
   }
 }
+
+  ngOnInit(): void {
+    this.loadGlobalAudit();
+  }
 
   get selectedItem(): FileQueueItem | null {
     if (this.selectedIndex === null) {
@@ -206,6 +210,7 @@ if (this.selectedIndex === null && this.fileQueue.length > 0) {
       }
     } finally {
       this.loading = false;
+      this.loadGlobalAudit();
     }
   }
 
@@ -289,6 +294,21 @@ clearQueue(): void {
     }
   }
 
+  getAuditClassificationLabel(classification: string): string {
+    switch (classification) {
+      case 'DATA_LAKE_LIMPIO':
+        return 'Data Lake limpio';
+      case 'FRONTERA':
+        return 'Frontera Data Lake / Data Swamp';
+      case 'DATA_SWAMP':
+        return 'Data Swamp';
+      case 'SIN_DATOS':
+        return 'Sin datos';
+      default:
+        return classification;
+    }
+  }
+
   getRecommendation(status: string): string {
     switch (status) {
       case 'ACCEPTED':
@@ -321,74 +341,87 @@ clearQueue(): void {
     }
   }
 
-private selectFirstReviewItem(): void {
-  const firstReviewItem = this.reviewItems[0];
+  private selectFirstReviewItem(): void {
+    const firstReviewItem = this.reviewItems[0];
 
-  if (!firstReviewItem) {
-    this.selectedIndex = null;
-    this.activeStatusView = null;
-    return;
-  }
-
-  this.selectedIndex = this.fileQueue.indexOf(firstReviewItem);
-}
-approveSelectedReviewItem(): void {
-  const item = this.selectedItem;
-
-  if (!item || !item.result || item.result.status !== 'REVIEW') {
-    return;
-  }
-
-  this.datasetService.approveDataset(item.result).subscribe({
-    next: result => {
-      item.result = result;
-      item.state = 'DONE';
-
-      this.syncQueueState();
-      this.selectFirstReviewItem();
-    },
-    error: () => {
-      item.errorMessage = 'No se pudo aprobar el documento en el backend.';
-      this.syncQueueState();
+    if (!firstReviewItem) {
+      this.selectedIndex = null;
+      this.activeStatusView = null;
+      return;
     }
-  });
-}
 
-rejectSelectedReviewItem(): void {
-  const item = this.selectedItem;
+    this.selectedIndex = this.fileQueue.indexOf(firstReviewItem);
+  }
+  approveSelectedReviewItem(): void {
+    const item = this.selectedItem;
 
-  if (!item || !item.result || item.result.status !== 'REVIEW') {
-    return;
+    if (!item || !item.result || item.result.status !== 'REVIEW') {
+      return;
+    }
+
+    this.datasetService.approveDataset(item.result).subscribe({
+      next: result => {
+        item.result = result;
+        item.state = 'DONE';
+
+        this.syncQueueState();
+        this.loadGlobalAudit();
+        this.selectFirstReviewItem();
+      },
+      error: () => {
+        item.errorMessage = 'No se pudo aprobar el documento en el backend.';
+        this.syncQueueState();
+      }
+    });
   }
 
-  this.datasetService.rejectDataset(item.result).subscribe({
-    next: result => {
-      item.result = result;
-      item.state = 'DONE';
+  rejectSelectedReviewItem(): void {
+    const item = this.selectedItem;
 
-      this.syncQueueState();
-      this.selectFirstReviewItem();
-    },
-    error: () => {
-      item.errorMessage = 'No se pudo rechazar el documento en el backend.';
-      this.syncQueueState();
+    if (!item || !item.result || item.result.status !== 'REVIEW') {
+      return;
     }
-  });
-}
 
-goToReviewView(): void {
-  this.activeStatusView = 'REVIEW';
-  this.syncQueueState();
-  this.router.navigate(['/datasets/en-revision']);
-}
+    this.datasetService.rejectDataset(item.result).subscribe({
+      next: result => {
+        item.result = result;
+        item.state = 'DONE';
 
-private syncQueueState(): void {
-  this.datasetStateService.setFileQueue(this.fileQueue);
-}
+        this.syncQueueState();
+        this.loadGlobalAudit();
+        this.selectFirstReviewItem();
+      },
+      error: () => {
+        item.errorMessage = 'No se pudo rechazar el documento en el backend.';
+        this.syncQueueState();
+      }
+    });
+  }
 
-goToStatusView(status: StatusView): void {
-  this.activeStatusView = status;
-  this.syncQueueState();
-  this.router.navigate(['/datasets/status', status]);
-}
+  goToReviewView(): void {
+    this.activeStatusView = 'REVIEW';
+    this.syncQueueState();
+    this.router.navigate(['/datasets/en-revision']);
+  }
+
+  private syncQueueState(): void {
+    this.datasetStateService.setFileQueue(this.fileQueue);
+  }
+
+  goToStatusView(status: StatusView): void {
+    this.activeStatusView = status;
+    this.syncQueueState();
+    this.router.navigate(['/datasets/status', status]);
+  }
+
+  loadGlobalAudit(): void {
+    this.datasetService.getGlobalAudit().subscribe({
+      next: (response) => {
+        this.globalAudit = response;
+      },
+      error: () => {
+        console.error('No se pudo obtener la auditoría global del Data Lake');
+      }
+    });
+  }
 }
