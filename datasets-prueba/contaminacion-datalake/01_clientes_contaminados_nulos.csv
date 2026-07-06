@@ -1,0 +1,11 @@
+id,nombre,ciudad,email,telefono
+1,Ana Lopez,Asuncion,ana@example.com,0981000001
+2,Carlos Rios,,carlos@example.com,
+3,Mariana Perez,Luque,,0981000003
+4,Diego Gomez,,diego@example.com,
+5,Sofia Benitez,Fernando de la Mora,,
+6,Lucas Torres,Lambare,lucas@example.com,0981000006
+7,Valeria Franco,,valeria@example.com,
+8,Nicolas Duarte,Luque,,0981000008
+9,Elena Ortiz,Capiata,elena@example.com,
+10,Martin Acosta,,martin@example.com,0981000010

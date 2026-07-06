@@ -10,6 +10,15 @@
 <nav class="header-status-buttons" aria-label="Estados de datasets">
   <button
     type="button"
+    class="status-nav-button lake-status"
+    (click)="goToDataLakeStatus()"
+  >
+    <span class="status-icon">DSI</span>
+    <span class="status-label">Estado Data Lake</span>
+  </button>
+
+  <button
+    type="button"
     class="status-nav-button accepted"
     [class.active]="activeStatusView === 'ACCEPTED'"
     (click)="goToStatusView('ACCEPTED')"
@@ -44,52 +53,6 @@
 </header>
 
   <main class="dashboard">
-    <section class="audit-summary-card" *ngIf="globalAudit">
-  <div class="audit-main-info">
-    <div>
-      <h2>Estado global del Data Lake</h2>
-      <p>{{ globalAudit.message }}</p>
-    </div>
-
-    <div class="audit-risk-box" [ngClass]="globalAudit.classification.toLowerCase()">
-      <strong>{{ globalAudit.globalRiskPercentage }}%</strong>
-      <span>{{ getAuditClassificationLabel(globalAudit.classification) }}</span>
-    </div>
-  </div>
-
-  <div class="audit-details-grid">
-    <div>
-      <span>Total archivos</span>
-      <strong>{{ globalAudit.totalFiles }}</strong>
-    </div>
-
-    <div>
-      <span>Raw</span>
-      <strong>{{ globalAudit.rawFiles }}</strong>
-    </div>
-
-    <div>
-      <span>Review</span>
-      <strong>{{ globalAudit.reviewFiles }}</strong>
-    </div>
-
-    <div>
-      <span>Rejected</span>
-      <strong>{{ globalAudit.rejectedFiles }}</strong>
-    </div>
-  </div>
-
-  <div class="audit-factors">
-    <div class="audit-factor" *ngFor="let factor of globalAudit.factors">
-      <div>
-        <strong>{{ factor.name }}</strong>
-        <p>{{ factor.description }}</p>
-      </div>
-
-      <span>{{ factor.value }}%</span>
-    </div>
-  </div>
-</section>
     <section class="top-grid">
       <!-- SUBIR DATASETS -->
       <div class="card upload-card">

@@ -14,12 +14,21 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class DataLakeAuditService {
+
+    private static final double QUALITY_WEIGHT = 0.35;
+    private static final double EXACT_DUPLICATION_WEIGHT = 0.30;
+    private static final double REDUNDANCY_WEIGHT = 0.35;
 
     private final MinioClient minioClient;
 
@@ -39,135 +48,72 @@ public class DataLakeAuditService {
         int reviewCount = reviewFiles.size();
         int rejectedCount = rejectedFiles.size();
         int totalFiles = rawCount + reviewCount + rejectedCount;
+        double ingestionRisk = calculateIngestionRisk(totalFiles, reviewCount, rejectedCount);
 
         if (totalFiles == 0) {
-        return new DataLakeAuditResponse(
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                "SIN_DATOS",
-                "El Data Lake todavía no contiene archivos para auditar.",
-                List.of()
-        );
+            return buildEmptyResponse(
+                    totalFiles,
+                    rawCount,
+                    reviewCount,
+                    rejectedCount,
+                    ingestionRisk,
+                    "El Data Lake todavía no contiene archivos para auditar."
+            );
         }
 
-        double stateRisk = calculateStateRisk(totalFiles, reviewCount, rejectedCount);
-        double rawQualityRisk = calculateRawQualityRisk(rawFiles);
-        double rawDuplicationRisk = calculateRawDuplicationRisk(rawFiles);
+        if (rawFiles.isEmpty()) {
+            return buildEmptyResponse(
+                    totalFiles,
+                    rawCount,
+                    reviewCount,
+                    rejectedCount,
+                    ingestionRisk,
+                    "No hay datasets activos en raw/ para calcular el DSI-v1. El IRI del flujo de ingestión es "
+                            + ingestionRisk
+                            + "%."
+            );
+        }
 
-        double globalRisk = round(
-                (stateRisk * 0.30)
-                        + (rawQualityRisk * 0.30)
-                        + (rawDuplicationRisk * 0.40)
-        );
-
-        String classification = classify(globalRisk);
-        String message = buildMessage(classification, globalRisk);
-
-        List<AuditFactorResponse> factors = List.of(
-                new AuditFactorResponse(
-                        "Riesgo por distribución de estados",
-                        stateRisk,
-                        0.30,
-                        round(stateRisk * 0.30),
-                        "Mide la proporción de archivos en revisión y rechazados dentro del Data Lake."
-                ),
-                new AuditFactorResponse(
-                        "Riesgo real de calidad en raw",
-                        rawQualityRisk,
-                        0.30,
-                        round(rawQualityRisk * 0.30),
-                        "Audita los archivos aceptados en raw/ para detectar problemas de calidad interna."
-                ),
-                new AuditFactorResponse(
-                        "Riesgo por duplicidad en raw",
-                        rawDuplicationRisk,
-                        0.40,
-                        round(rawDuplicationRisk * 0.40),
-                        "Detecta archivos con el mismo contenido dentro de raw/, aunque tengan nombres diferentes."
-                )
-        );
+        RepositoryAuditMetrics metrics = calculateRepositoryMetrics(rawFiles);
+        double dataSwampIndex = calculateDataSwampIndex(metrics);
+        String classification = classify(dataSwampIndex);
 
         return new DataLakeAuditResponse(
                 totalFiles,
                 rawCount,
                 reviewCount,
                 rejectedCount,
-                stateRisk,
-                rawQualityRisk,
-                rawDuplicationRisk,
-                globalRisk,
+                ingestionRisk,
+                metrics.qualityRisk(),
+                metrics.exactDuplicationRisk(),
+                metrics.redundancyRisk(),
+                dataSwampIndex,
+                dataSwampIndex,
                 classification,
-                message,
-                factors
+                buildDataLakeMessage(classification, dataSwampIndex, ingestionRisk),
+                buildDsiFactors(metrics)
         );
     }
 
     public DataLakeAuditResponse auditRepository(String prefix) {
         String normalizedPrefix = normalizePrefix(prefix);
-
         List<String> repositoryFiles = listCsvFiles(normalizedPrefix);
-
         int totalFiles = repositoryFiles.size();
 
         if (totalFiles == 0) {
-            return new DataLakeAuditResponse(
+            return buildEmptyResponse(
                     0,
                     0,
                     0,
                     0,
                     0,
-                    0,
-                    0,
-                    0,
-                    "SIN_DATOS",
-                    "No se encontraron archivos CSV para auditar en la ruta indicada.",
-                    List.of()
+                    "No se encontraron archivos CSV para auditar en la ruta indicada."
             );
         }
 
-        double qualityRisk = calculateRawQualityRisk(repositoryFiles);
-        double redundancyRisk = calculateRawDuplicationRisk(repositoryFiles);
-
-        double globalRisk = round(
-                (qualityRisk * 0.45)
-                        + (redundancyRisk * 0.55)
-        );
-
-        String classification = classify(globalRisk);
-
-        String message = switch (classification) {
-            case "DATA_LAKE_LIMPIO" ->
-                    "El repositorio auditado se mantiene limpio. Riesgo global: " + globalRisk + "%.";
-            case "FRONTERA" ->
-                    "El repositorio auditado se encuentra en zona de frontera entre Data Lake y Data Swamp. Riesgo global: " + globalRisk + "%.";
-            case "DATA_SWAMP" ->
-                    "El repositorio auditado presenta alto riesgo de Data Swamp. Riesgo global: " + globalRisk + "%.";
-            default ->
-                    "No se pudo determinar la clasificación del repositorio auditado.";
-        };
-
-        List<AuditFactorResponse> factors = List.of(
-                new AuditFactorResponse(
-                        "Riesgo real de calidad del repositorio",
-                        qualityRisk,
-                        0.45,
-                        round(qualityRisk * 0.45),
-                        "Audita los archivos existentes para detectar nulos, columnas duplicadas, filas duplicadas y archivos sin datos útiles."
-                ),
-                new AuditFactorResponse(
-                        "Riesgo por redundancia del repositorio",
-                        redundancyRisk,
-                        0.55,
-                        round(redundancyRisk * 0.55),
-                        "Detecta archivos duplicados o muy similares dentro de la ruta auditada."
-                )
-        );
+        RepositoryAuditMetrics metrics = calculateRepositoryMetrics(repositoryFiles);
+        double dataSwampIndex = calculateDataSwampIndex(metrics);
+        String classification = classify(dataSwampIndex);
 
         return new DataLakeAuditResponse(
                 totalFiles,
@@ -175,13 +121,64 @@ public class DataLakeAuditService {
                 0,
                 0,
                 0,
-                qualityRisk,
-                redundancyRisk,
-                globalRisk,
+                metrics.qualityRisk(),
+                metrics.exactDuplicationRisk(),
+                metrics.redundancyRisk(),
+                dataSwampIndex,
+                dataSwampIndex,
                 classification,
-                message,
-                factors
+                buildRepositoryMessage(classification, dataSwampIndex),
+                buildDsiFactors(metrics)
         );
+    }
+
+    private DataLakeAuditResponse buildEmptyResponse(
+            int totalFiles,
+            int rawFiles,
+            int reviewFiles,
+            int rejectedFiles,
+            double ingestionRisk,
+            String message
+    ) {
+        return new DataLakeAuditResponse(
+                totalFiles,
+                rawFiles,
+                reviewFiles,
+                rejectedFiles,
+                ingestionRisk,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "SIN_DATOS",
+                message,
+                List.of()
+        );
+    }
+
+    private RepositoryAuditMetrics calculateRepositoryMetrics(List<String> repositoryFiles) {
+        List<RepositoryFileFingerprint> fingerprints = buildFingerprints(repositoryFiles);
+
+        return new RepositoryAuditMetrics(
+                calculateQualityRisk(repositoryFiles),
+                calculateExactDuplicationRisk(fingerprints),
+                calculatePartialRedundancyRisk(fingerprints)
+        );
+    }
+
+    private List<RepositoryFileFingerprint> buildFingerprints(List<String> repositoryFiles) {
+        List<RepositoryFileFingerprint> fingerprints = new ArrayList<>();
+
+        for (String repositoryFile : repositoryFiles) {
+            fingerprints.add(new RepositoryFileFingerprint(
+                    repositoryFile,
+                    calculateSha256(repositoryFile),
+                    readNormalizedDataRows(repositoryFile)
+            ));
+        }
+
+        return fingerprints;
     }
 
     private String normalizePrefix(String prefix) {
@@ -228,26 +225,29 @@ public class DataLakeAuditService {
         }
     }
 
-    private double calculateStateRisk(int totalFiles, int reviewFiles, int rejectedFiles) {
-        double score = ((reviewFiles * 50.0) + (rejectedFiles * 100.0)) / totalFiles;
-        return round(score);
+    private double calculateIngestionRisk(int totalFiles, int reviewFiles, int rejectedFiles) {
+        if (totalFiles == 0) {
+            return 0;
+        }
+
+        return round(((reviewFiles * 50.0) + (rejectedFiles * 100.0)) / totalFiles);
     }
 
-    private double calculateRawQualityRisk(List<String> rawFiles) {
-        if (rawFiles.isEmpty()) {
+    private double calculateQualityRisk(List<String> repositoryFiles) {
+        if (repositoryFiles.isEmpty()) {
             return 0;
         }
 
         double totalRisk = 0;
 
-        for (String rawFile : rawFiles) {
-            totalRisk += auditRawCsvFile(rawFile);
+        for (String repositoryFile : repositoryFiles) {
+            totalRisk += auditCsvQualityRisk(repositoryFile);
         }
 
-        return round(totalRisk / rawFiles.size());
+        return round(totalRisk / repositoryFiles.size());
     }
 
-    private double auditRawCsvFile(String objectName) {
+    private double auditCsvQualityRisk(String objectName) {
         try (
                 InputStream inputStream = minioClient.getObject(
                         GetObjectArgs.builder()
@@ -275,32 +275,21 @@ public class DataLakeAuditService {
                     ? rows.subList(1, rows.size())
                     : List.of();
 
-            boolean hasNoDataRows = dataRows.isEmpty();
-            boolean hasDuplicateColumns = hasDuplicateColumns(headers);
-            double nullPercentage = calculateNullPercentage(dataRows);
+            if (dataRows.isEmpty()) {
+                return 100;
+            }
+
+            double nullPercentage = calculateNullPercentage(dataRows, headers.length);
             double duplicateRowsPercentage = calculateDuplicateRowsPercentage(dataRows);
+            double duplicateColumnRisk = hasDuplicateColumns(headers) ? 100 : 0;
 
-            double risk = 0;
+            double qualityRisk = (nullPercentage * 0.50)
+                    + (duplicateRowsPercentage * 0.30)
+                    + (duplicateColumnRisk * 0.20);
 
-            if (hasNoDataRows) {
-                risk += 40;
-            }
-
-            if (hasDuplicateColumns) {
-                risk += 20;
-            }
-
-            if (nullPercentage > 0) {
-                risk += Math.min(25, nullPercentage * 0.35);
-            }
-
-            if (duplicateRowsPercentage > 0) {
-                risk += Math.min(15, duplicateRowsPercentage * 0.25);
-            }
-
-            return round(Math.min(risk, 100));
+            return round(Math.min(qualityRisk, 100));
         } catch (Exception e) {
-            throw new RuntimeException("Error al auditar archivo raw: " + objectName, e);
+            throw new RuntimeException("Error al auditar calidad del archivo: " + objectName, e);
         }
     }
 
@@ -314,18 +303,16 @@ public class DataLakeAuditService {
         for (String header : headers) {
             String normalized = header.trim().toLowerCase();
 
-            if (seen.contains(normalized)) {
+            if (!seen.add(normalized)) {
                 return true;
             }
-
-            seen.add(normalized);
         }
 
         return false;
     }
 
-    private double calculateNullPercentage(List<String[]> dataRows) {
-        if (dataRows.isEmpty()) {
+    private double calculateNullPercentage(List<String[]> dataRows, int totalColumns) {
+        if (dataRows.isEmpty() || totalColumns == 0) {
             return 100;
         }
 
@@ -333,17 +320,15 @@ public class DataLakeAuditService {
         int nullCells = 0;
 
         for (String[] row : dataRows) {
-            for (String cell : row) {
+            for (int i = 0; i < totalColumns; i++) {
                 totalCells++;
+
+                String cell = i < row.length ? row[i] : "";
 
                 if (cell == null || cell.trim().isEmpty()) {
                     nullCells++;
                 }
             }
-        }
-
-        if (totalCells == 0) {
-            return 100;
         }
 
         return round((nullCells * 100.0) / totalCells);
@@ -360,29 +345,33 @@ public class DataLakeAuditService {
         for (String[] row : dataRows) {
             String normalizedRow = String.join("|", row).trim().toLowerCase();
 
-            if (uniqueRows.contains(normalizedRow)) {
+            if (!uniqueRows.add(normalizedRow)) {
                 duplicatedRows++;
-            } else {
-                uniqueRows.add(normalizedRow);
             }
         }
 
         return round((duplicatedRows * 100.0) / dataRows.size());
     }
 
-    private double calculateRawDuplicationRisk(List<String> rawFiles) {
-        if (rawFiles.size() <= 1) {
+    private double calculateExactDuplicationRisk(List<RepositoryFileFingerprint> fingerprints) {
+        if (fingerprints.isEmpty()) {
             return 0;
         }
 
-        List<RepositoryFileFingerprint> fingerprints = new ArrayList<>();
+        Set<String> uniqueHashes = new HashSet<>();
 
-        for (String rawFile : rawFiles) {
-            fingerprints.add(new RepositoryFileFingerprint(
-                    rawFile,
-                    calculateSha256(rawFile),
-                    readNormalizedRows(rawFile)
-            ));
+        for (RepositoryFileFingerprint fingerprint : fingerprints) {
+            uniqueHashes.add(fingerprint.sha256());
+        }
+
+        int duplicatedFiles = fingerprints.size() - uniqueHashes.size();
+
+        return round((duplicatedFiles * 100.0) / fingerprints.size());
+    }
+
+    private double calculatePartialRedundancyRisk(List<RepositoryFileFingerprint> fingerprints) {
+        if (fingerprints.size() <= 1) {
+            return 0;
         }
 
         Map<String, Double> riskByFile = new HashMap<>();
@@ -403,7 +392,6 @@ public class DataLakeAuditService {
                             first.objectName(),
                             Math.max(riskByFile.get(first.objectName()), pairRisk)
                     );
-
                     riskByFile.put(
                             second.objectName(),
                             Math.max(riskByFile.get(second.objectName()), pairRisk)
@@ -418,7 +406,7 @@ public class DataLakeAuditService {
             totalRisk += risk;
         }
 
-        return round(totalRisk / rawFiles.size());
+        return round(totalRisk / fingerprints.size());
     }
 
     private double calculatePairRedundancyRisk(
@@ -426,13 +414,17 @@ public class DataLakeAuditService {
             RepositoryFileFingerprint second
     ) {
         if (first.sha256().equals(second.sha256())) {
-            return 100;
+            return 0;
         }
 
         double similarity = calculateRowSimilarityPercentage(
                 first.normalizedRows(),
                 second.normalizedRows()
         );
+
+        if (similarity == 100) {
+            return 100;
+        }
 
         if (similarity >= 95) {
             return 90;
@@ -450,10 +442,6 @@ public class DataLakeAuditService {
     }
 
     private double calculateRowSimilarityPercentage(Set<String> firstRows, Set<String> secondRows) {
-        if (firstRows.isEmpty() && secondRows.isEmpty()) {
-            return 100;
-        }
-
         if (firstRows.isEmpty() || secondRows.isEmpty()) {
             return 0;
         }
@@ -461,12 +449,12 @@ public class DataLakeAuditService {
         Set<String> intersection = new HashSet<>(firstRows);
         intersection.retainAll(secondRows);
 
-        int maxRows = Math.max(firstRows.size(), secondRows.size());
+        int comparableRows = Math.min(firstRows.size(), secondRows.size());
 
-        return round((intersection.size() * 100.0) / maxRows);
+        return round((intersection.size() * 100.0) / comparableRows);
     }
 
-    private Set<String> readNormalizedRows(String objectName) {
+    private Set<String> readNormalizedDataRows(String objectName) {
         try (
                 InputStream inputStream = minioClient.getObject(
                         GetObjectArgs.builder()
@@ -480,12 +468,18 @@ public class DataLakeAuditService {
         ) {
             Set<String> rows = new HashSet<>();
             String line;
+            boolean firstLine = true;
 
             while ((line = reader.readLine()) != null) {
+                if (firstLine) {
+                    firstLine = false;
+                    continue;
+                }
+
                 String normalized = normalizeCsvLine(line);
 
                 if (!normalized.isBlank()) {
-                    rows.add(normalized);
+                    rows.add(hashText(normalized));
                 }
             }
 
@@ -531,28 +525,94 @@ public class DataLakeAuditService {
         }
     }
 
-    private String classify(double globalRisk) {
-        if (globalRisk <= 30) {
-            return "DATA_LAKE_LIMPIO";
+    private String hashText(String text) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new RuntimeException("Error al calcular hash de fila", e);
+        }
+    }
+
+    private double calculateDataSwampIndex(RepositoryAuditMetrics metrics) {
+        return round(
+                (metrics.qualityRisk() * QUALITY_WEIGHT)
+                        + (metrics.exactDuplicationRisk() * EXACT_DUPLICATION_WEIGHT)
+                        + (metrics.redundancyRisk() * REDUNDANCY_WEIGHT)
+        );
+    }
+
+    private List<AuditFactorResponse> buildDsiFactors(RepositoryAuditMetrics metrics) {
+        return List.of(
+                new AuditFactorResponse(
+                        "Q - Riesgo por calidad",
+                        metrics.qualityRisk(),
+                        QUALITY_WEIGHT,
+                        round(metrics.qualityRisk() * QUALITY_WEIGHT),
+                        "Calcula Qi = 0,50Ni + 0,30Fi + 0,20Ci sobre nulos, filas duplicadas internas y columnas duplicadas."
+                ),
+                new AuditFactorResponse(
+                        "D - Riesgo por duplicidad exacta",
+                        metrics.exactDuplicationRisk(),
+                        EXACT_DUPLICATION_WEIGHT,
+                        round(metrics.exactDuplicationRisk() * EXACT_DUPLICATION_WEIGHT),
+                        "Calcula D = (N - H) / N mediante hash global SHA-256."
+                ),
+                new AuditFactorResponse(
+                        "R - Riesgo por redundancia parcial",
+                        metrics.redundancyRisk(),
+                        REDUNDANCY_WEIGHT,
+                        round(metrics.redundancyRisk() * REDUNDANCY_WEIGHT),
+                        "Compara hashes por fila y convierte la similitud en riesgo con la escala 65%, 80%, 95% y 100%."
+                )
+        );
+    }
+
+    private String classify(double dataSwampIndex) {
+        if (dataSwampIndex <= 30) {
+            return "DATA_LAKE_SALUDABLE";
         }
 
-        if (globalRisk <= 60) {
-            return "FRONTERA";
+        if (dataSwampIndex <= 60) {
+            return "ZONA_FRONTERA";
         }
 
         return "DATA_SWAMP";
     }
 
-    private String buildMessage(String classification, double globalRisk) {
+    private String buildDataLakeMessage(
+            String classification,
+            double dataSwampIndex,
+            double ingestionRisk
+    ) {
         return switch (classification) {
-            case "DATA_LAKE_LIMPIO" ->
-                    "El Data Lake se mantiene limpio. Riesgo global: " + globalRisk + "%.";
-            case "FRONTERA" ->
-                    "El Data Lake se encuentra en una zona de frontera. Riesgo global: " + globalRisk + "%.";
+            case "DATA_LAKE_SALUDABLE" ->
+                    "DSI-v1: " + dataSwampIndex + "%. El Data Lake activo se mantiene saludable. IRI: "
+                            + ingestionRisk
+                            + "%.";
+            case "ZONA_FRONTERA" ->
+                    "DSI-v1: " + dataSwampIndex + "%. El Data Lake presenta señales de degradación. IRI: "
+                            + ingestionRisk
+                            + "%.";
             case "DATA_SWAMP" ->
-                    "El Data Lake presenta alto riesgo de convertirse en Data Swamp. Riesgo global: " + globalRisk + "%.";
+                    "DSI-v1: " + dataSwampIndex + "%. El Data Lake presenta alto riesgo de Data Swamp. IRI: "
+                            + ingestionRisk
+                            + "%.";
             default ->
                     "No se pudo determinar la clasificación del Data Lake.";
+        };
+    }
+
+    private String buildRepositoryMessage(String classification, double dataSwampIndex) {
+        return switch (classification) {
+            case "DATA_LAKE_SALUDABLE" ->
+                    "El repositorio auditado se mantiene saludable. DSI-v1: " + dataSwampIndex + "%.";
+            case "ZONA_FRONTERA" ->
+                    "El repositorio auditado se encuentra en zona frontera. DSI-v1: " + dataSwampIndex + "%.";
+            case "DATA_SWAMP" ->
+                    "El repositorio auditado presenta alto riesgo de Data Swamp. DSI-v1: " + dataSwampIndex + "%.";
+            default ->
+                    "No se pudo determinar la clasificación del repositorio auditado.";
         };
     }
 
@@ -560,10 +620,17 @@ public class DataLakeAuditService {
         return Math.round(value * 100.0) / 100.0;
     }
 
+    private record RepositoryAuditMetrics(
+            double qualityRisk,
+            double exactDuplicationRisk,
+            double redundancyRisk
+    ) {
+    }
+
     private record RepositoryFileFingerprint(
-        String objectName,
-        String sha256,
-        Set<String> normalizedRows
+            String objectName,
+            String sha256,
+            Set<String> normalizedRows
     ) {
     }
 }

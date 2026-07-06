@@ -37,9 +37,11 @@ export interface DataLakeAuditResponse {
   rawFiles: number;
   reviewFiles: number;
   rejectedFiles: number;
-  stateRiskPercentage: number;
-  rawQualityRiskPercentage: number;
-  rawDuplicationRiskPercentage: number;
+  ingestionRiskPercentage: number;
+  qualityRiskPercentage: number;
+  exactDuplicationRiskPercentage: number;
+  redundancyRiskPercentage: number;
+  dataSwampIndexPercentage: number;
   globalRiskPercentage: number;
   classification: string;
   message: string;

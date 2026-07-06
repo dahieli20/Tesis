@@ -168,7 +168,7 @@ public class DatasetService {
             }
         }
 
-        if (highestPartialMatch >= 60.0) {
+        if (highestPartialMatch >= 65.0) {
 
             String reviewPath = "review/" + fileName;
 
@@ -178,7 +178,7 @@ public class DatasetService {
                     fileName,
                     reviewPath,
                     "REVIEW",
-                    "Posible duplicado parcial. Coincidencia de "
+                    "Posible redundancia parcial. Coincidencia de "
                             + highestPartialMatch
                             + "% con: "
                             + mostSimilarFile,
@@ -228,7 +228,7 @@ public class DatasetService {
             Set<String> existingRows
     ) {
 
-        if (newRows == null || newRows.isEmpty()) {
+        if (newRows == null || newRows.isEmpty() || existingRows == null || existingRows.isEmpty()) {
             return 0.0;
         }
 
@@ -236,8 +236,10 @@ public class DatasetService {
 
         intersection.retainAll(existingRows);
 
+        int comparableRows = Math.min(newRows.size(), existingRows.size());
+
         return Math.round(
-                ((intersection.size() * 100.0) / newRows.size()) * 100.0
+                ((intersection.size() * 100.0) / comparableRows) * 100.0
         ) / 100.0;
     }
 
