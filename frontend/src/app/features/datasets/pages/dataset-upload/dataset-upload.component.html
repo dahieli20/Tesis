@@ -10,6 +10,15 @@
 <nav class="header-status-buttons" aria-label="Estados de datasets">
   <button
     type="button"
+    class="status-nav-button config"
+    (click)="openThresholdModal()"
+  >
+    <span class="status-icon">⚙</span>
+    <span class="status-label">Configurar escala</span>
+  </button>
+
+  <button
+    type="button"
     class="status-nav-button lake-status"
     (click)="goToDataLakeStatus()"
   >
@@ -50,6 +59,7 @@
     <span class="status-number">{{ rejectedCount }}</span>
   </button>
 </nav>
+
 </header>
 
   <main class="dashboard">
@@ -304,4 +314,117 @@
       </div>
     </section>
   </main>
+
+  <div
+    class="threshold-modal-backdrop"
+    *ngIf="showThresholdModal"
+    (click)="closeThresholdModal()"
+  ></div>
+
+  <div class="threshold-modal" *ngIf="showThresholdModal && riskConfig">
+    <div class="threshold-modal-header">
+      <div>
+        <h2>Configurar escala DSI</h2>
+        <p>Definí los rangos para clasificar el estado del Data Lake.</p>
+      </div>
+
+      <button
+        type="button"
+        class="threshold-modal-close"
+        (click)="closeThresholdModal()"
+      >
+        ✕
+      </button>
+    </div>
+
+    <div class="threshold-modal-body">
+      <div class="threshold-input-grid">
+        <div class="threshold-input-group">
+          <label>Saludable hasta (%)</label>
+          <input
+            #cleanMaxInput
+            type="number"
+            min="0"
+            max="100"
+            [value]="riskConfig.cleanMax"
+          />
+        </div>
+
+        <div class="threshold-input-group">
+          <label>Frontera hasta (%)</label>
+          <input
+            #frontierMaxInput
+            type="number"
+            min="0"
+            max="100"
+            [value]="riskConfig.frontierMax"
+          />
+        </div>
+      </div>
+
+      <div class="threshold-range-preview">
+        <div class="range-bar">
+          <div
+            class="range-segment healthy"
+            [style.width.%]="cleanMaxInput.value"
+          ></div>
+
+          <div
+            class="range-segment frontier"
+            [style.width.%]="+frontierMaxInput.value - +cleanMaxInput.value"
+          ></div>
+
+          <div
+            class="range-segment swamp"
+            [style.width.%]="100 - +frontierMaxInput.value"
+          ></div>
+        </div>
+
+        <div class="range-labels">
+          <span class="healthy-text">
+            Saludable: 0% - {{ cleanMaxInput.value }}%
+          </span>
+
+          <span class="frontier-text">
+            Frontera: {{ (+cleanMaxInput.value + 0.01).toFixed(2) }}% - {{ frontierMaxInput.value }}%
+          </span>
+
+          <span class="swamp-text">
+            Data Swamp: {{ (+frontierMaxInput.value + 0.01).toFixed(2) }}% - 100%
+          </span>
+        </div>
+      </div>
+
+      <p class="threshold-help">
+        El límite saludable debe ser menor que el límite frontera.
+      </p>
+      
+    <div class="success-message-box" *ngIf="riskConfigMessage">
+      <span class="success-check">✓</span>
+      <strong>{{ riskConfigMessage }}</strong>
+    </div>
+
+      <p class="error-text" *ngIf="riskConfigError">
+        {{ riskConfigError }}
+      </p>
+    </div>
+
+    <div class="threshold-modal-actions">
+      <button
+        type="button"
+        class="secondary-button"
+        (click)="closeThresholdModal()"
+      >
+        Cancelar
+      </button>
+
+      <button
+        type="button"
+        class="primary-button"
+        (click)="saveRiskThresholdConfig(cleanMaxInput.value, frontierMaxInput.value)"
+      >
+        Guardar escala
+      </button>
+    </div>
+  </div>
 </div>

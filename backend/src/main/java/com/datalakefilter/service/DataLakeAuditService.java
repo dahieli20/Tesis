@@ -29,14 +29,19 @@ public class DataLakeAuditService {
     private static final double QUALITY_WEIGHT = 0.35;
     private static final double EXACT_DUPLICATION_WEIGHT = 0.30;
     private static final double REDUNDANCY_WEIGHT = 0.35;
+    private final RiskThresholdConfigService riskThresholdConfigService;
 
     private final MinioClient minioClient;
 
     @Value("${minio.bucket}")
     private String bucketName;
 
-    public DataLakeAuditService(MinioClient minioClient) {
+    public DataLakeAuditService(
+            MinioClient minioClient,
+            RiskThresholdConfigService riskThresholdConfigService
+    ) {
         this.minioClient = minioClient;
+        this.riskThresholdConfigService = riskThresholdConfigService;
     }
 
     public DataLakeAuditResponse auditDataLake() {
@@ -569,11 +574,14 @@ public class DataLakeAuditService {
     }
 
     private String classify(double dataSwampIndex) {
-        if (dataSwampIndex <= 30) {
+        double cleanMax = riskThresholdConfigService.getCleanMax();
+        double frontierMax = riskThresholdConfigService.getFrontierMax();
+
+        if (dataSwampIndex <= cleanMax) {
             return "DATA_LAKE_SALUDABLE";
         }
 
-        if (dataSwampIndex <= 60) {
+        if (dataSwampIndex <= frontierMax) {
             return "ZONA_FRONTERA";
         }
 

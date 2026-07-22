@@ -1,8 +1,8 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { DatasetStateService } from '../../services/dataset-state.service';
-import { DatasetService } from '../../services/dataset.service';
+import { DatasetService, DataLakeAuditResponse, RiskThresholdConfigResponse} from '../../services/dataset.service';
 
 import {
   FileQueueItem,
@@ -18,28 +18,38 @@ import {
   templateUrl: './dataset-upload.component.html',
   styleUrls: ['./dataset-upload.component.css']
 })
-export class DatasetUploadComponent {
+export class DatasetUploadComponent implements OnInit {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   fileQueue: FileQueueItem[] = [];
   selectedIndex: number | null = null;
   activeStatusView: StatusView | null = null;
+  globalAudit: DataLakeAuditResponse | null = null;
+  riskConfig: RiskThresholdConfigResponse | null = null;
+  riskConfigMessage = '';
+  riskConfigError = '';
 
   loading = false;
   errorMessage = '';
   isDragging = false;
+  showThresholdModal = false;
 
-constructor(
-  private datasetService: DatasetService,
-  private datasetStateService: DatasetStateService,
-  private router: Router
-) {
-  this.fileQueue = this.datasetStateService.getFileQueueSnapshot();
+  constructor(
+    private datasetService: DatasetService,
+    private datasetStateService: DatasetStateService,
+    private router: Router
+  ) {
+    this.fileQueue = this.datasetStateService.getFileQueueSnapshot();
 
-  if (this.fileQueue.length > 0) {
-    this.selectedIndex = 0;
+    if (this.fileQueue.length > 0) {
+      this.selectedIndex = 0;
+    }
   }
-}
+
+  ngOnInit(): void {
+    this.loadRiskThresholdConfig();
+    this.loadGlobalAudit();
+  }
 
   get selectedItem(): FileQueueItem | null {
     if (this.selectedIndex === null) {
@@ -205,6 +215,7 @@ if (this.selectedIndex === null && this.fileQueue.length > 0) {
       }
     } finally {
       this.loading = false;
+      this.loadGlobalAudit();
     }
   }
 
@@ -344,6 +355,7 @@ clearQueue(): void {
         item.state = 'DONE';
 
         this.syncQueueState();
+        this.loadGlobalAudit();
         this.selectFirstReviewItem();
       },
       error: () => {
@@ -396,4 +408,84 @@ clearQueue(): void {
     this.syncQueueState();
     this.router.navigate(['/datasets/lake-status']);
   }
+
+  loadGlobalAudit(): void {
+    this.datasetService.getRawRepositoryAudit().subscribe({
+      next: response => {
+        this.globalAudit = response;
+      },
+      error: () => {
+        console.error('No se pudo auditar el contenido de raw/');
+      }
+    });
+  }
+
+  getAuditClassificationLabel(classification: string): string {
+    switch (classification) {
+      case 'DATA_LAKE_SALUDABLE':
+        return 'Data Lake saludable';
+      case 'ZONA_FRONTERA':
+        return 'Zona frontera';
+      case 'DATA_SWAMP':
+        return 'Data Swamp';
+      case 'SIN_DATOS':
+        return 'Sin datos';
+      default:
+        return classification;
+    }
+  }
+
+  loadRiskThresholdConfig(): void {
+    this.datasetService.getRiskThresholdConfig().subscribe({
+      next: response => {
+        this.riskConfig = response;
+      },
+      error: () => {
+        this.riskConfigError = 'No se pudo obtener la configuración de rangos.';
+      }
+    });
+  }
+
+  saveRiskThresholdConfig(cleanMaxValue: string, frontierMaxValue: string): void {
+    const cleanMax = Number(cleanMaxValue);
+    const frontierMax = Number(frontierMaxValue);
+
+    this.riskConfigMessage = '';
+    this.riskConfigError = '';
+
+    if (Number.isNaN(cleanMax) || Number.isNaN(frontierMax)) {
+      this.riskConfigError = 'Los rangos deben ser valores numéricos.';
+      return;
+    }
+
+    if (cleanMax < 0 || frontierMax > 100 || cleanMax >= frontierMax) {
+      this.riskConfigError = 'La escala debe cumplir: 0 <= limpio < frontera <= 100.';
+      return;
+    }
+
+    this.datasetService.updateRiskThresholdConfig({
+      cleanMax,
+      frontierMax
+    }).subscribe({
+      next: response => {
+        this.riskConfig = response;
+        this.riskConfigMessage = 'Escala actualizada correctamente.';
+        this.riskConfigError = '';
+        
+        this.loadGlobalAudit();
+      },
+      error: () => {
+        this.riskConfigError = 'No se pudo guardar la configuración de rangos.';
+      }
+    });
+  }
+
+  openThresholdModal(): void {
+    this.showThresholdModal = true;
+  }
+
+  closeThresholdModal(): void {
+    this.showThresholdModal = false;
+  }
+
 }

@@ -62,6 +62,22 @@ public class DatasetService {
         }
 
         CsvQualityResult quality = csvQualityService.analyze(file);
+        if (fileNameExistsInRaw(fileName)) {
+                String rejectedPath = "rejected/" + fileName;
+
+                minioService.uploadFile(rejectedPath, file);
+
+                return new UploadDatasetResponse(
+                        fileName,
+                        rejectedPath,
+                        "REJECTED",
+                        "Ya existe un archivo con el mismo nombre en raw/. El archivo fue rechazado directamente.",
+                        null,
+                        100.0,
+                        "raw/" + fileName,
+                        quality
+                );
+        }
 
         if (!quality.hasDataRows()) {
             String rejectedPath = "rejected/" + fileName;
@@ -178,10 +194,7 @@ public class DatasetService {
                     fileName,
                     reviewPath,
                     "REVIEW",
-                    "Posible redundancia parcial. Coincidencia de "
-                            + highestPartialMatch
-                            + "% con: "
-                            + mostSimilarFile,
+                    buildPartialMatchMessage(highestPartialMatch, mostSimilarFile),
                     newFileHash,
                     highestPartialMatch,
                     mostSimilarFile,
@@ -243,6 +256,31 @@ public class DatasetService {
         ) / 100.0;
     }
 
+        private String buildPartialMatchMessage(double matchPercentage, String matchedFile) {
+        String formattedPercentage = formatPercentage(matchPercentage);
+
+        if (Double.compare(matchPercentage, 100.0) == 0) {
+                return "El archivo comparte el 100% de sus filas únicas con un dataset existente: "
+                        + matchedFile
+                        + ". Esto indica que podría tratarse de una copia parcial, una versión reducida "
+                        + "o un subconjunto de datos ya almacenado. Se requiere revisión antes de incorporarlo al Data Lake.";
+        }
+
+        return "El archivo comparte el "
+                + formattedPercentage
+                + "% de sus filas únicas con un dataset existente: "
+                + matchedFile
+                + ". Esto puede indicar redundancia parcial, por lo que se recomienda revisión antes de almacenarlo definitivamente.";
+        }
+
+        private String formatPercentage(double percentage) {
+                if (percentage % 1 == 0) {
+                return String.valueOf((int) percentage);
+                }
+
+                return String.valueOf(percentage);
+        }
+
     private UploadDatasetResponse resolveReviewDecision(
             DatasetDecisionRequest request,
             String status,
@@ -258,6 +296,24 @@ public class DatasetService {
 
         String sourcePath = validateReviewPath(request.path());
         String fileName = resolveFileName(request.fileName(), sourcePath);
+
+        if ("ACCEPTED".equals(status) && fileNameExistsInRaw(fileName)) {
+                String rejectedPath = "rejected/" + fileName;
+
+                minioService.moveFile(sourcePath, rejectedPath);
+
+                return new UploadDatasetResponse(
+                        fileName,
+                        rejectedPath,
+                        "REJECTED",
+                        "No se puede aprobar el documento porque ya existe un archivo con el mismo nombre en raw/. Fue enviado a rejected/.",
+                        request.fileHash(),
+                        100.0,
+                        "raw/" + fileName,
+                        request.quality()
+                );
+        }
+
         String destinationPath = destinationFolder + "/" + fileName;
 
         minioService.moveFile(sourcePath, destinationPath);
@@ -312,5 +368,25 @@ public class DatasetService {
         }
 
         return resolvedFileName;
+    }
+
+    private boolean fileNameExistsInRaw(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return false;
+        }
+
+        return minioService.listFiles("raw/")
+                .stream()
+                .map(this::extractFileName)
+                .anyMatch(existingFileName ->
+                        existingFileName.equalsIgnoreCase(fileName.trim())
+                );
+    }
+
+    private String extractFileName(String objectPath) {
+        int separatorIndex = objectPath.lastIndexOf("/");
+        return separatorIndex >= 0
+                ? objectPath.substring(separatorIndex + 1)
+                : objectPath;
     }
 }

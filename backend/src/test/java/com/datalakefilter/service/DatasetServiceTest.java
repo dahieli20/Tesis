@@ -8,11 +8,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DatasetServiceTest {
@@ -28,6 +36,47 @@ class DatasetServiceTest {
 
     @InjectMocks
     private DatasetService datasetService;
+
+    @Test
+    void partialMatchAtOneHundredExplainsRowsAreContainedInsteadOfExactDuplicate() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "alumnos_parcial.csv",
+                "text/csv",
+                "cedula,nombre\n1,Ana\n2,Luis\n3,Camila\n4,Jorge\n".getBytes()
+        );
+        CsvQualityResult quality = new CsvQualityResult(
+                4,
+                2,
+                0.0,
+                0.0,
+                false,
+                true
+        );
+        String rawFile = "raw/alumnos_filas_duplicadas - copia.csv";
+
+        when(csvQualityService.analyze(file)).thenReturn(quality);
+        when(minioService.listFiles("raw/")).thenReturn(List.of(rawFile));
+        when(hashService.calculateFileHash(file)).thenReturn("new-hash");
+        when(hashService.calculateRowHashes(file)).thenReturn(Set.of("row-1", "row-2", "row-3", "row-4"));
+        when(minioService.getFile(rawFile)).thenReturn(
+                new ByteArrayInputStream("hash".getBytes()),
+                new ByteArrayInputStream("rows".getBytes())
+        );
+        when(hashService.calculateHash(any(InputStream.class))).thenReturn("existing-hash");
+        when(hashService.calculateRowHashes(any(InputStream.class))).thenReturn(Set.of("row-1", "row-2", "row-3"));
+
+        UploadDatasetResponse response = datasetService.processDataset(file);
+
+        verify(minioService).uploadFile("review/alumnos_parcial.csv", file);
+        assertEquals("REVIEW", response.status());
+        assertEquals(100.0, response.partialMatchPercentage());
+        assertEquals(rawFile, response.matchedWith());
+        assertEquals(
+                "El archivo comparte el 100% de sus filas únicas con un dataset existente: raw/alumnos_filas_duplicadas - copia.csv. Esto indica que podría tratarse de una copia parcial, una versión reducida o un subconjunto de datos ya almacenado. Se requiere revisión antes de incorporarlo al Data Lake.",
+                response.message()
+                );
+        }
 
     @Test
     void approveDatasetMovesReviewFileToRaw() {

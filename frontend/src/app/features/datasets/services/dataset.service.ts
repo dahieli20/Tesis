@@ -77,6 +77,14 @@ export class DatasetService {
     );
   }
 
+  getRawRepositoryAudit(): Observable<DataLakeAuditResponse> {
+    const timestamp = new Date().getTime();
+
+    return this.http.get<DataLakeAuditResponse>(
+      `${this.apiUrl}/audit/repository?prefix=raw/&t=${timestamp}`
+    );
+  }
+
   getGlobalAudit(): Observable<DataLakeAuditResponse> {
     const timestamp = new Date().getTime();
 
@@ -85,5 +93,31 @@ export class DatasetService {
     );
   }
 
+  getRiskThresholdConfig(): Observable<RiskThresholdConfigResponse> {
+    return this.http.get<RiskThresholdConfigResponse>(
+      `${this.apiUrl}/audit/config/thresholds`
+    );
+  }
 
+  updateRiskThresholdConfig(
+    request: RiskThresholdConfigRequest
+  ): Observable<RiskThresholdConfigResponse> {
+    return this.http.put<RiskThresholdConfigResponse>(
+      `${this.apiUrl}/audit/config/thresholds`,
+      request
+    );
+  }
+  
+}
+export interface RiskThresholdConfigRequest {
+  cleanMax: number;
+  frontierMax: number;
+}
+
+export interface RiskThresholdConfigResponse {
+  cleanMax: number;
+  frontierMax: number;
+  cleanRange: string;
+  frontierRange: string;
+  swampRange: string;
 }

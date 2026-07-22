@@ -783,4 +783,206 @@ h3 {
     width: 100%;
   }
 }
+.threshold-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.28);
+  z-index: 90;
+}
 
+.threshold-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  z-index: 100;
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+}
+
+.threshold-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.threshold-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #0f172a;
+}
+
+.threshold-modal-header p {
+  margin: 5px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.threshold-modal-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.threshold-modal-body {
+  padding: 18px 22px;
+}
+
+.threshold-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.threshold-input-group label {
+  display: block;
+  margin-bottom: 7px;
+  color: #334155;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.threshold-input-group input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 700;
+  outline: none;
+}
+
+.threshold-range-preview {
+  margin-top: 18px;
+}
+
+.range-bar {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.range-segment.healthy {
+  background: #22c55e;
+}
+
+.range-segment.frontier {
+  background: #f59e0b;
+}
+
+.range-segment.swamp {
+  background: #ef4444;
+}
+
+.range-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.healthy-text {
+  color: #166534;
+}
+
+.frontier-text {
+  color: #92400e;
+}
+
+.swamp-text {
+  color: #991b1b;
+}
+
+.threshold-help {
+  margin: 16px 0 0;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  color: #64748b;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.threshold-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 22px 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.threshold-modal-actions button {
+  min-width: 140px;
+}
+
+.status-nav-button.config {
+  background: #f8fafc;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.status-nav-button.config .status-icon {
+  background: #e0f2fe;
+  color: #2563eb;
+}
+
+@media (max-width: 600px) {
+  .threshold-input-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .threshold-modal-actions {
+    flex-direction: column;
+  }
+
+  .threshold-modal-actions button {
+    width: 100%;
+  }
+}
+
+.success-message-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  color: #166534;
+  font-weight: 700;
+}
+
+.success-check {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.success-message-box strong {
+  font-size: 14px;
+}
