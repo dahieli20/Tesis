@@ -243,4 +243,12 @@ export class DataLakeStatusComponent implements OnInit {
       maximumFractionDigits: 2
     }).format(value);
   }
+
+  formatAuditMessage(message: string | null | undefined): string {
+  if (!message) {
+    return '';
+  }
+
+  return message.replace(/(\d+)\.(\d+)%/g, '$1,$2%');
+}
 }
