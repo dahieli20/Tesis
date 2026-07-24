@@ -458,8 +458,8 @@ clearQueue(): void {
       return;
     }
 
-    if (cleanMax < 0 || frontierMax > 100 || cleanMax >= frontierMax) {
-      this.riskConfigError = 'La escala debe cumplir: 0 <= limpio < frontera <= 100.';
+    if (cleanMax < 0 || cleanMax >= 100 || frontierMax <= 0 || frontierMax >= 100 || cleanMax >= frontierMax) {
+      this.riskConfigError = 'La escala debe cumplir: 0 <= saludable < frontera < 100. El límite frontera debe ser menor que 100.';
       return;
     }
 

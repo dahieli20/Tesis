@@ -19,57 +19,54 @@
   </header>
 
   <main class="dashboard">
-    <p class="error-text" *ngIf="errorMessage">{{ errorMessage }}</p>
+    @if (errorMessage) {
+      <p class="error-text">{{ errorMessage }}</p>
+    }
 
-    <section class="audit-hero" *ngIf="globalAudit; else loadingState">
-      <div class="audit-copy">
-        <span class="eyebrow">Data Swamp Index</span>
-        <h2>DSI-v1: {{ globalAudit.dataSwampIndexPercentage }}%</h2>
-        <p>{{ globalAudit.message }}</p>
-      </div>
-
-      <div class="audit-score" [ngClass]="globalAudit.classification.toLowerCase()">
-        <strong>{{ globalAudit.dataSwampIndexPercentage }}%</strong>
-        <span>{{ getAuditClassificationLabel(globalAudit.classification) }}</span>
-        <p>{{ getAuditClassificationDescription(globalAudit.classification) }}</p>
-      </div>
-    </section>
-
-    <ng-template #loadingState>
+    @if (globalAudit) {
+      <section class="audit-hero">
+        <div class="audit-copy">
+          <span class="eyebrow">Data Swamp Index</span>
+          <h2>DSI-v1: {{ globalAudit.dataSwampIndexPercentage }}%</h2>
+          <p>{{ globalAudit.message }}</p>
+        </div>
+        <div class="audit-score" [ngClass]="globalAudit.classification.toLowerCase()">
+          <strong>{{ globalAudit.dataSwampIndexPercentage }}%</strong>
+          <span>{{ getAuditClassificationLabel(globalAudit.classification) }}</span>
+          <p>{{ getAuditClassificationDescription(globalAudit.classification) }}</p>
+        </div>
+      </section>
+    } @else {
       <section class="empty-panel">
         <h2>{{ loading ? 'Calculando estado del Data Lake' : 'Sin datos de auditoría' }}</h2>
         <p>Cuando existan datasets procesados, este panel mostrará el DSI-v1 y el IRI.</p>
       </section>
-    </ng-template>
+    }
 
-    <ng-container *ngIf="globalAudit">
+
+    @if (globalAudit) {
       <section class="metrics-grid">
         <div>
           <span>Total procesados</span>
           <strong>{{ globalAudit.totalFiles }}</strong>
         </div>
-
         <div>
           <span>Raw activo</span>
           <strong>{{ globalAudit.rawFiles }}</strong>
         </div>
-
         <div>
           <span>Review</span>
           <strong>{{ globalAudit.reviewFiles }}</strong>
         </div>
-
         <div>
           <span>Rejected</span>
           <strong>{{ globalAudit.rejectedFiles }}</strong>
         </div>
-
         <div>
           <span>IRI</span>
           <strong>{{ globalAudit.ingestionRiskPercentage }}%</strong>
         </div>
       </section>
-
       <section class="plain-summary-grid">
         <article>
           <span>Estado del Data Lake activo</span>
@@ -79,23 +76,22 @@
             Si es bajo, el Data Lake activo se mantiene controlado.
           </p>
         </article>
-
         <article>
           <span>Flujo de ingreso</span>
           <strong>{{ getIriLevel(globalAudit.ingestionRiskPercentage) }}</strong>
           <p>{{ getIriDescription(globalAudit.ingestionRiskPercentage) }}</p>
         </article>
-
-        <article *ngIf="getTopFactor() as topFactor">
-          <span>Principal alerta actual</span>
-          <strong>{{ getFactorFriendlyName(topFactor) }}</strong>
-          <p>
-            {{ getFactorShortCode(topFactor) }} está en {{ topFactor.value }}%
-            (riesgo {{ getRiskLevel(topFactor.value) | lowercase }}).
-          </p>
-        </article>
+        @if (getTopFactor(); as topFactor) {
+          <article>
+            <span>Principal alerta actual</span>
+            <strong>{{ getFactorFriendlyName(topFactor) }}</strong>
+            <p>
+              {{ getFactorShortCode(topFactor) }} está en {{ topFactor.value }}%
+              (riesgo {{ getRiskLevel(topFactor.value) | lowercase }}).
+            </p>
+          </article>
+        }
       </section>
-
       <section class="section-band">
         <div class="section-heading">
           <h2>Qué está afectando el DSI-v1</h2>
@@ -104,50 +100,44 @@
             activo. El aporte muestra cuántos puntos suma cada factor al DSI-v1.
           </p>
         </div>
-
         <div class="factor-list">
-          <article class="factor-row" *ngFor="let factor of globalAudit.factors">
-            <div>
-              <div class="factor-title">
-                <span>{{ getFactorShortCode(factor) }}</span>
-                <h3>{{ getFactorFriendlyName(factor) }}</h3>
-              </div>
-
-              <p>{{ getFactorFriendlyDescription(factor) }}</p>
-
-              <details>
-                <summary>Ver cálculo técnico</summary>
-                <code>{{ getFactorFormula(factor) }}</code>
-                <p>{{ factor.description }}</p>
-              </details>
-            </div>
-
-            <div class="factor-values">
+          @for (factor of globalAudit.factors; track factor) {
+            <article class="factor-row">
               <div>
-                <span>Riesgo medido</span>
-                <strong>{{ factor.value }}%</strong>
-                <p>{{ getFactorMeasuredExplanation(factor) }}</p>
+                <div class="factor-title">
+                  <span>{{ getFactorShortCode(factor) }}</span>
+                  <h3>{{ getFactorFriendlyName(factor) }}</h3>
+                </div>
+                <p>{{ getFactorFriendlyDescription(factor) }}</p>
+                <details>
+                  <summary>Ver cálculo técnico</summary>
+                  <code>{{ getFactorFormula(factor) }}</code>
+                  <p>{{ factor.description }}</p>
+                </details>
               </div>
-
-              <div>
-                <span>Peso en el índice</span>
-                <strong>{{ factor.weight * 100 | number:'1.0-0' }}%</strong>
-                <p>{{ getFactorWeightExplanation(factor) }}</p>
+              <div class="factor-values">
+                <div>
+                  <span>Riesgo medido</span>
+                  <strong>{{ factor.value }}%</strong>
+                  <p>{{ getFactorMeasuredExplanation(factor) }}</p>
+                </div>
+                <div>
+                  <span>Peso en el índice</span>
+                  <strong>{{ factor.weight * 100 | number:'1.0-0' }}%</strong>
+                  <p>{{ getFactorWeightExplanation(factor) }}</p>
+                </div>
+                <div>
+                  <span>Aporte al DSI-v1</span>
+                  <strong>{{ factor.contribution }} pts</strong>
+                  <p>{{ getFactorContributionExplanation(factor) }}</p>
+                </div>
               </div>
-
-              <div>
-                <span>Aporte al DSI-v1</span>
-                <strong>{{ factor.contribution }} pts</strong>
-                <p>{{ getFactorContributionExplanation(factor) }}</p>
-              </div>
-            </div>
-          </article>
+            </article>
+          }
         </div>
       </section>
-
       <details class="technical-panel">
         <summary>Ver fórmulas completas del modelo</summary>
-
         <section class="formula-grid">
           <article>
             <h3>Fórmula general</h3>
@@ -157,7 +147,6 @@
               El factor M queda preparado como extensión futura.
             </p>
           </article>
-
           <article>
             <h3>Q - Quality Risk</h3>
             <code>Qi = 0,50Ni + 0,30Fi + 0,20Ci</code>
@@ -166,7 +155,6 @@
               Si un CSV no tiene filas de datos, Qi = 1.
             </p>
           </article>
-
           <article>
             <h3>D - Duplication Risk</h3>
             <code>D = (N - H) / N</code>
@@ -175,7 +163,6 @@
               únicos.
             </p>
           </article>
-
           <article>
             <h3>R - Redundancy Risk</h3>
             <code>Similitud(i,j) = filas comunes / min(filas i, filas j)</code>
@@ -184,7 +171,6 @@
               100%.
             </p>
           </article>
-
           <article>
             <h3>M - Metadata Risk</h3>
             <code>Mi = metadatos faltantes / metadatos requeridos</code>
@@ -193,7 +179,6 @@
               del prototipo.
             </p>
           </article>
-
           <article>
             <h3>IRI - Ingestion Risk Index</h3>
             <code>IRI = (review x 50 + rejected x 100) / total</code>
@@ -203,7 +188,6 @@
           </article>
         </section>
       </details>
-
       <section class="section-band">
         <div class="section-heading">
           <h2>Cómo leer los porcentajes</h2>
@@ -212,7 +196,6 @@
             atención requiere ese punto.
           </p>
         </div>
-
         <div class="index-scale-grid">
           <article>
             <h3>0% - 30%</h3>
@@ -221,7 +204,6 @@
               El indicador está en una zona esperada. Conviene seguir monitoreando.
             </p>
           </article>
-
           <article>
             <h3>31% - 60%</h3>
             <code>Riesgo medio</code>
@@ -229,7 +211,6 @@
               Ya hay señales de alerta. Es buen momento para revisar archivos dudosos.
             </p>
           </article>
-
           <article>
             <h3>61% - 100%</h3>
             <code>Riesgo alto</code>
@@ -240,7 +221,6 @@
           </article>
         </div>
       </section>
-
       <section class="section-band">
         <div class="section-heading">
           <h2>Cuándo dos archivos se consideran parecidos</h2>
@@ -249,51 +229,42 @@
             que no son iguales, pero repiten mucha información.
           </p>
         </div>
-
         <div class="redundancy-scale">
           <div>
             <span>Similitud menor a 65%</span>
             <strong>Riesgo 0</strong>
           </div>
-
           <div>
             <span>65% - 79%</span>
             <strong>Riesgo 0,45</strong>
           </div>
-
           <div>
             <span>80% - 94%</span>
             <strong>Riesgo 0,70</strong>
           </div>
-
           <div>
             <span>95% - 99%</span>
             <strong>Riesgo 0,90</strong>
           </div>
-
           <div>
             <span>100%</span>
             <strong>Riesgo 1,00</strong>
           </div>
         </div>
       </section>
-
       <section class="scale-band">
         <h2>Escala de interpretación del DSI</h2>
-
         <div class="scale-grid">
           <div>
             <strong>0 - 30</strong>
             <span>Data Lake saludable</span>
             <p>Bajo nivel de contaminación.</p>
           </div>
-
           <div>
             <strong>31 - 60</strong>
             <span>Zona frontera</span>
             <p>El repositorio presenta señales de degradación.</p>
           </div>
-
           <div>
             <strong>61 - 100</strong>
             <span>Data Swamp</span>
@@ -301,6 +272,6 @@
           </div>
         </div>
       </section>
-    </ng-container>
+    }
   </main>
 </div>

@@ -11,8 +11,8 @@
       type="button"
       class="secondary-button"
       (click)="goBack()"
-    >
-      Volver 
+      >
+      Volver
     </button>
   </header>
 
@@ -30,40 +30,39 @@
           </span>
         </div>
 
-        <ng-container *ngIf="statusItems.length > 0; else emptyStatus">
+        @if (statusItems.length > 0) {
           <div class="queue-list">
-            <div
-              class="queue-item"
-              *ngFor="let item of statusItems; let i = index"
-              [class.active]="selectedIndex === i"
-              (click)="selectStatusItem(i)"
-            >
-              <div class="file-data">
-                <strong>{{ item.file.name }}</strong>
-                <span>{{ formatFileSize(item.file.size) }}</span>
+            @for (item of statusItems; track item; let i = $index) {
+              <div
+                class="queue-item"
+                [class.active]="selectedIndex === i"
+                (click)="selectStatusItem(i)"
+                >
+                <div class="file-data">
+                  <strong>{{ item.file.name }}</strong>
+                  <span>{{ formatFileSize(item.file.size) }}</span>
+                </div>
+                <span
+                  class="status-pill"
+                  [ngClass]="getStatusClass(item.result?.status || '')"
+                  >
+                  {{ getStatusLabel(item.result?.status || '') }}
+                </span>
               </div>
-
-              <span
-                class="status-pill"
-                [ngClass]="getStatusClass(item.result?.status || '')"
-              >
-                {{ getStatusLabel(item.result?.status || '') }}
-              </span>
-            </div>
+            }
           </div>
-        </ng-container>
-
-        <ng-template #emptyStatus>
+        } @else {
           <div class="empty-state">
             <div class="empty-icon">📂</div>
             <h3>{{ emptyTitle }}</h3>
             <p>{{ emptyDescription }}</p>
           </div>
-        </ng-template>
+        }
+
       </div>
 
       <div class="card detail-card">
-        <ng-container *ngIf="selectedItem?.result; else emptyDetail">
+        @if (selectedItem?.result) {
           <div class="detail-header">
             <div class="detail-file">
               <div>
@@ -71,109 +70,96 @@
                 <p>{{ formatFileSize(selectedItem?.file?.size || 0) }}</p>
               </div>
             </div>
-
             <span
               class="status-pill large"
               [ngClass]="getStatusClass(selectedItem?.result?.status || '')"
-            >
+              >
               {{ getStatusLabel(selectedItem?.result?.status || '') }}
             </span>
           </div>
-
           <div class="info-grid">
             <div>
               <span>Archivo</span>
               <strong>{{ selectedItem?.result?.fileName }}</strong>
             </div>
-
             <div>
               <span>Ruta destino</span>
               <strong>{{ selectedItem?.result?.path }}</strong>
             </div>
-
             <div>
               <span>Coincidencia parcial</span>
               <strong>{{ selectedItem?.result?.partialMatchPercentage || 0 }}%</strong>
             </div>
-
             <div>
               <span>Coincide con</span>
               <strong>{{ selectedItem?.result?.matchedWith || 'Ninguno' }}</strong>
             </div>
           </div>
-
           <div class="message-box">
             <div>
               <strong>Motivo</strong>
               <p>{{ selectedItem?.result?.message }}</p>
             </div>
-
             <div>
               <strong>Recomendación</strong>
               <p>{{ getRecommendation(selectedItem?.result?.status || '') }}</p>
             </div>
           </div>
-
           <h3>Calidad del CSV</h3>
-
-          <div class="quality-grid" *ngIf="selectedItem?.result?.quality">
-            <div>
-              <span>Filas</span>
-              <strong>{{ selectedItem?.result?.quality?.totalRows }}</strong>
+          @if (selectedItem?.result?.quality) {
+            <div class="quality-grid">
+              <div>
+                <span>Filas</span>
+                <strong>{{ selectedItem?.result?.quality?.totalRows }}</strong>
+              </div>
+              <div>
+                <span>Columnas</span>
+                <strong>{{ selectedItem?.result?.quality?.totalColumns }}</strong>
+              </div>
+              <div>
+                <span>Valores nulos</span>
+                <strong>{{ selectedItem?.result?.quality?.nullPercentage }}%</strong>
+              </div>
+              <div>
+                <span>Filas duplicadas internas</span>
+                <strong>{{ selectedItem?.result?.quality?.duplicateRowsPercentage }}%</strong>
+              </div>
+              <div>
+                <span>Columnas duplicadas</span>
+                <strong>
+                  {{ selectedItem?.result?.quality?.hasDuplicateColumns ? 'Sí' : 'No' }}
+                </strong>
+              </div>
             </div>
-
-            <div>
-              <span>Columnas</span>
-              <strong>{{ selectedItem?.result?.quality?.totalColumns }}</strong>
+          }
+          @if (selectedItem?.result?.status === 'REVIEW') {
+            <div
+              class="review-actions"
+              >
+              <button
+                type="button"
+                class="secondary-button rejected-action"
+                (click)="rejectSelectedItem()"
+                >
+                Rechazar documento
+              </button>
+              <button
+                type="button"
+                class="primary-button accepted-action"
+                (click)="approveSelectedItem()"
+                >
+                Aprobar documento
+              </button>
             </div>
-
-            <div>
-              <span>Valores nulos</span>
-              <strong>{{ selectedItem?.result?.quality?.nullPercentage }}%</strong>
-            </div>
-
-            <div>
-              <span>Filas duplicadas internas</span>
-              <strong>{{ selectedItem?.result?.quality?.duplicateRowsPercentage }}%</strong>
-            </div>
-
-            <div>
-              <span>Columnas duplicadas</span>
-              <strong>
-                {{ selectedItem?.result?.quality?.hasDuplicateColumns ? 'Sí' : 'No' }}
-              </strong>
-            </div>
-          </div>
-
-          <div
-            class="review-actions"
-            *ngIf="selectedItem?.result?.status === 'REVIEW'"
-          >
-            <button
-              type="button"
-              class="secondary-button rejected-action"
-              (click)="rejectSelectedItem()"
-            >
-              Rechazar documento
-            </button>
-
-            <button
-              type="button"
-              class="primary-button accepted-action"
-              (click)="approveSelectedItem()"
-            >
-              Aprobar documento
-            </button>
-          </div>
-        </ng-container>
-
-        <ng-template #emptyDetail>
+          }
+        } @else {
           <div class="empty-state detail-empty">
             <div class="empty-icon">📊</div>
             <h3>Seleccioná un documento</h3>
             <p>Acá vas a poder ver el detalle del análisis del CSV.</p>
           </div>
-        </ng-template>
+        }
+
       </div>
     </section>
   </main>
