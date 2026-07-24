@@ -42,17 +42,17 @@ public class RiskThresholdConfigService {
     }
 
     private void validate(double cleanMax, double frontierMax) {
-        if (cleanMax < 0 || frontierMax > 100) {
+        if (cleanMax < 0 || cleanMax >= 100 || frontierMax <= 0 || frontierMax >= 100) {
             throw new ResponseStatusException(
                     BAD_REQUEST,
-                    "Los rangos deben estar entre 0 y 100."
+                    "Los umbrales deben cumplir: 0 <= saludable < frontera < 100."
             );
         }
 
         if (cleanMax >= frontierMax) {
             throw new ResponseStatusException(
                     BAD_REQUEST,
-                    "El límite de Data Lake limpio debe ser menor al límite de frontera."
+                    "El límite saludable debe ser menor que el límite frontera."
             );
         }
     }
