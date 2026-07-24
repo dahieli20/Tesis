@@ -10,8 +10,8 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 @Service
 public class RiskThresholdConfigService {
 
-    private double cleanMax = 30.0;
-    private double frontierMax = 60.0;
+    private double cleanMax = 25.0;
+    private double frontierMax = 50.0;
 
     public RiskThresholdConfigResponse getConfig() {
         return buildResponse();

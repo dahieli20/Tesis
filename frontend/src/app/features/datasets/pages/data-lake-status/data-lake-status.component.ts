@@ -212,7 +212,7 @@ export class DataLakeStatusComponent implements OnInit {
   }
 
   getFactorContributionExplanation(factor: AuditFactorResponse): string {
-    return `Este factor agrega ${factor.contribution} puntos al DSI-v1 final.`;
+    return `Este factor agrega ${factor.contribution} puntos al DSI final.`;
   }
 
   getFactorFormula(factor: AuditFactorResponse): string {
@@ -229,5 +229,18 @@ export class DataLakeStatusComponent implements OnInit {
     }
 
     return '';
+  }
+
+  formatPercentage(value: number | null | undefined): string {
+    if (value === null || value === undefined) {
+      return '0';
+    }
+
+    const hasDecimals = value % 1 !== 0;
+
+    return new Intl.NumberFormat('es-PY', {
+      minimumFractionDigits: hasDecimals ? 2 : 0,
+      maximumFractionDigits: 2
+    }).format(value);
   }
 }

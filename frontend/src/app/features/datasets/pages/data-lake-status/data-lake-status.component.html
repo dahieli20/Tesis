@@ -23,6 +23,7 @@
       <p class="error-text">{{ errorMessage }}</p>
     }
 
+<<<<<<< Updated upstream
     @if (globalAudit) {
       <section class="audit-hero">
         <div class="audit-copy">
@@ -37,9 +38,27 @@
         </div>
       </section>
     } @else {
+=======
+    <section class="audit-hero" *ngIf="globalAudit; else loadingState">
+      <div class="audit-copy">
+        <span class="eyebrow">Data Swamp Index</span>
+        <h2>DSI: {{ formatPercentage(globalAudit.dataSwampIndexPercentage) }}%</h2>
+        <p>{{ globalAudit.message }}</p>
+      </div>
+
+      <div class="audit-score" [ngClass]="globalAudit.classification.toLowerCase()">
+        <!-- Cambio aplicado aquí -->
+        <strong>{{ formatPercentage(globalAudit.dataSwampIndexPercentage) }}%</strong>
+        <span>{{ getAuditClassificationLabel(globalAudit.classification) }}</span>
+        <p>{{ getAuditClassificationDescription(globalAudit.classification) }}</p>
+      </div>
+    </section>
+
+    <ng-template #loadingState>
+>>>>>>> Stashed changes
       <section class="empty-panel">
         <h2>{{ loading ? 'Calculando estado del Data Lake' : 'Sin datos de auditoría' }}</h2>
-        <p>Cuando existan datasets procesados, este panel mostrará el DSI-v1 y el IRI.</p>
+        <p>Cuando existan datasets procesados, este panel mostrará el DSI y el IRI.</p>
       </section>
     }
 
@@ -64,7 +83,8 @@
         </div>
         <div>
           <span>IRI</span>
-          <strong>{{ globalAudit.ingestionRiskPercentage }}%</strong>
+          <!-- Cambio aplicado aquí -->
+          <strong>{{ formatPercentage(globalAudit.ingestionRiskPercentage) }}%</strong>
         </div>
       </section>
       <section class="plain-summary-grid">
@@ -81,6 +101,7 @@
           <strong>{{ getIriLevel(globalAudit.ingestionRiskPercentage) }}</strong>
           <p>{{ getIriDescription(globalAudit.ingestionRiskPercentage) }}</p>
         </article>
+<<<<<<< Updated upstream
         @if (getTopFactor(); as topFactor) {
           <article>
             <span>Principal alerta actual</span>
@@ -91,19 +112,32 @@
             </p>
           </article>
         }
+=======
+
+        <article *ngIf="getTopFactor() as topFactor">
+          <span>Principal alerta actual</span>
+          <strong>{{ getFactorFriendlyName(topFactor) }}</strong>
+          <p>
+            <!-- Cambio aplicado aquí -->
+            {{ getFactorShortCode(topFactor) }} está en {{ formatPercentage(topFactor.value) }}%
+            (riesgo {{ getRiskLevel(topFactor.value) | lowercase }}).
+          </p>
+        </article>
+>>>>>>> Stashed changes
       </section>
       <section class="section-band">
         <div class="section-heading">
-          <h2>Qué está afectando el DSI-v1</h2>
+          <h2>Qué está afectando el DSI</h2>
           <p>
             Estos tres factores explican por qué sube o baja el riesgo del Data Lake
-            activo. El aporte muestra cuántos puntos suma cada factor al DSI-v1.
+            activo. El aporte muestra cuántos puntos suma cada factor al DSI.
           </p>
         </div>
         <div class="factor-list">
           @for (factor of globalAudit.factors; track factor) {
             <article class="factor-row">
               <div>
+<<<<<<< Updated upstream
                 <div class="factor-title">
                   <span>{{ getFactorShortCode(factor) }}</span>
                   <h3>{{ getFactorFriendlyName(factor) }}</h3>
@@ -134,6 +168,29 @@
               </div>
             </article>
           }
+=======
+                <span>Riesgo medido</span>
+                <!-- Cambio aplicado aquí -->
+                <strong>{{ formatPercentage(factor.value) }}%</strong>
+                <p>{{ getFactorMeasuredExplanation(factor) }}</p>
+              </div>
+
+              <div>
+                <span>Peso en el índice</span>
+                <!-- Aquí se deja el pipe porque 1.0-0 elimina los decimales, por ende no hay punto -->
+                <strong>{{ factor.weight * 100 | number:'1.0-0' }}%</strong>
+                <p>{{ getFactorWeightExplanation(factor) }}</p>
+              </div>
+
+              <div>
+                <span>Aporte al DSI</span>
+                <!-- Cambio aplicado aquí -->
+                <strong>{{ formatPercentage(factor.contribution) }} pts</strong>
+                <p>{{ getFactorContributionExplanation(factor) }}</p>
+              </div>
+            </div>
+          </article>
+>>>>>>> Stashed changes
         </div>
       </section>
       <details class="technical-panel">
